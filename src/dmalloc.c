@@ -1,12 +1,14 @@
-#define _GNU_SOURCE
-
+/* This is where we capture malloc type calls so we can gather
+   debug. See the README to understand the LD_PRELOAD trick we use and
+   skip to the bottom of this file to see the captures
+*/
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "dmalloc_common.h"
 #include "dmalloc_wrappers.h"
 
-void * dmalloc_calloc(size_t count, size_t size)
+void * dmalloc_calloc_intercept(size_t count, size_t size)
 {
   void *ptr;
 
@@ -17,10 +19,10 @@ void * dmalloc_calloc(size_t count, size_t size)
 
   dmalloc_stats_newalloc(ptr, dmalloc_usable_size(ptr));
 
-  return ptr; 
+  return ptr;
 }
 
-void dmalloc_free(void *ptr)
+void dmalloc_free_intercept(void *ptr)
 {
   dmalloc_printf("dmalloc_free\n");
 
@@ -30,12 +32,12 @@ void dmalloc_free(void *ptr)
   return;
 }
 
-void * dmalloc_malloc(size_t size)
+void * dmalloc_malloc_intercept(size_t size)
 {
   void *ptr;
 
   dmalloc_printf("dmalloc_malloc\n");
-  
+
   /* alloc bytes and hide our birthday inside */
   ptr = dmalloc_malloc_wrapper(size + dmalloc_extrabytes_sz());
   ptr = dmalloc_extrabytes_setandhide(ptr, time(NULL));
@@ -46,22 +48,44 @@ void * dmalloc_malloc(size_t size)
 }
 
 /* see TODO in README for thoughts on a better implementation */
-void * dmalloc_realloc(void *ptr, size_t size)
+void * dmalloc_realloc_intercept(void *ptr, size_t size)
 {
   void *p;
 
   dmalloc_printf("dmalloc_realloc\n");
-  
+
   dmalloc_stats_newfree(ptr, dmalloc_usable_size(ptr), dmalloc_extrabytes_get(ptr));
 
   /* alloc bytes and hide birthday inside */
   p = dmalloc_realloc_wrapper(ptr, size + dmalloc_extrabytes_sz());
   p = dmalloc_extrabytes_setandhide(ptr, time(NULL));
-  
+
   dmalloc_stats_newalloc(p, dmalloc_usable_size(p));
-  
+
   return p;
 }
+
+#ifdef LINUX
+void * calloc(size_t count, size_t size)
+{
+  return dmalloc_calloc_intercept(count, size);
+}
+
+void free(void *ptr)
+{
+  dmalloc_free_intercept(ptr);
+}
+
+void * malloc(size_t size)
+{
+  return dmalloc_malloc_intercept(size);
+}
+
+void * realloc(void *ptr, size_t size)
+{
+  return dmalloc_realloc_intercept(ptr, size);
+}
+#endif	/* LINUX */
 
 #ifdef DARWIN
 /* from dyld-interposing.h */
@@ -72,12 +96,12 @@ void * dmalloc_realloc(void *ptr, size_t size)
   } _interpose_##_replacee __attribute__ ((section ("__DATA,__interpose"))) = { \
     (const void*)(unsigned long)&_replacment,				\
     (const void*)(unsigned long)&_replacee				\
-  }; 
+  };
 
-
-DYLD_INTERPOSE(dmalloc_calloc, calloc)
-DYLD_INTERPOSE(dmalloc_free, free)
-DYLD_INTERPOSE(dmalloc_malloc, malloc)
-DYLD_INTERPOSE(dmalloc_realloc, realloc)
+DYLD_INTERPOSE(dmalloc_calloc_intercept, calloc)
+DYLD_INTERPOSE(dmalloc_free_intercept, free)
+DYLD_INTERPOSE(dmalloc_malloc_intercept, malloc)
+DYLD_INTERPOSE(dmalloc_realloc_intercept, realloc)
 
 #endif	/* DARWIN */
+

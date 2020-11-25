@@ -6,6 +6,7 @@
 #include <string.h>
 #include <dlfcn.h>
 
+#include "dmalloc_common.h"
 #include "dmalloc_wrappers.h"
 
 typedef void * (*real_calloc_t)(size_t, size_t);
@@ -43,7 +44,7 @@ static void * my_realloc(void *ptr, size_t size)
 void __attribute__ ((constructor)) dmalloc_wrapper_init(void)
 {
 
-  puts("wrapper_init");
+  dmalloc_printf("dmalloc_wrapper_init\n");
 #if 0  
   real_callocp = (real_calloc_t)dlsym(RTLD_NEXT, "calloc");
   putchar('1');
