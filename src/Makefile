@@ -7,7 +7,7 @@ uname := $(shell uname -s)
 ifeq ($(uname), Linux)
 	os = LINUX
 	target = libdmalloc.so
-	objects += dmalloc_wrappers_linux.o
+	objects += libc_wrappers_linux.o
 endif
 ifeq ($(uname), Darwin)
 	os = DARWIN
@@ -23,6 +23,7 @@ $(target): $(objects)
 
 check: $(target)
 
+# don't remove libs on clean so we can build for multiple arch, see distclean
 clean:
 	rm -f *.o *.d *~
 

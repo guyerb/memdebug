@@ -1,12 +1,16 @@
-/* This is where we capture malloc type calls so we can gather
-   debug. See the README to understand the LD_PRELOAD trick we use and
-   skip to the bottom of this file to see the captures
-*/
+/* dmalloc: a simple malloc debugging library.
+ *
+ * See README and dmalloc.pdf for description of usage, output,
+ * issues, etc. but basically:
+ *
+ *  - gather some stats on usage on every (c|m)alloc,realloc, free
+ *  - print those stats to stderr a max of every five seconds
+ */
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "dmalloc_common.h"
-#include "dmalloc_wrappers.h"
+#include "libc_wrappers.h"
 
 void * dmalloc_calloc_intercept(size_t count, size_t size)
 {
@@ -14,7 +18,7 @@ void * dmalloc_calloc_intercept(size_t count, size_t size)
 
   dmalloc_printf("dmalloc_calloc\n");
   /* alloc bytes and hide our birthday inside */
-  ptr = dmalloc_calloc_wrapper(count, size + dmalloc_extrabytes_sz());
+  ptr = libc_calloc_wrapper(count, size + dmalloc_extrabytes_sz());
   ptr = dmalloc_extrabytes_setandhide(ptr, time(NULL));
 
   dmalloc_stats_newalloc(ptr, dmalloc_usable_size(ptr));
@@ -27,7 +31,7 @@ void dmalloc_free_intercept(void *ptr)
   dmalloc_printf("dmalloc_free\n");
 
   dmalloc_stats_newfree(ptr, dmalloc_usable_size(ptr), dmalloc_extrabytes_get(ptr));
-  dmalloc_free_wrapper(ptr);
+  libc_free_wrapper(ptr);
 
   return;
 }
@@ -39,7 +43,7 @@ void * dmalloc_malloc_intercept(size_t size)
   dmalloc_printf("dmalloc_malloc\n");
 
   /* alloc bytes and hide our birthday inside */
-  ptr = dmalloc_malloc_wrapper(size + dmalloc_extrabytes_sz());
+  ptr = libc_malloc_wrapper(size + dmalloc_extrabytes_sz());
   ptr = dmalloc_extrabytes_setandhide(ptr, time(NULL));
 
   dmalloc_stats_newalloc(ptr, dmalloc_usable_size(ptr));
@@ -57,7 +61,7 @@ void * dmalloc_realloc_intercept(void *ptr, size_t size)
   dmalloc_stats_newfree(ptr, dmalloc_usable_size(ptr), dmalloc_extrabytes_get(ptr));
 
   /* alloc bytes and hide birthday inside */
-  p = dmalloc_realloc_wrapper(ptr, size + dmalloc_extrabytes_sz());
+  p = libc_realloc_wrapper(ptr, size + dmalloc_extrabytes_sz());
   p = dmalloc_extrabytes_setandhide(ptr, time(NULL));
 
   dmalloc_stats_newalloc(p, dmalloc_usable_size(p));

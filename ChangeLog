@@ -1,5 +1,9 @@
 ChangeLog for dmalloc
-
+2020-11-24 - v0.3
+	* compiles and runs (and crashes) on Linux and OS X
+	* tracking functionality in place.
+	* still needs logging
+	* under git control
 2020-11-22 - v0.2
 	* wrappers running and callable  as dmalloc, dfree .....
 	- hang issue on nameing as malloc, free ...
