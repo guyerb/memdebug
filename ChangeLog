@@ -1,0 +1,11 @@
+ChangeLog for dmalloc
+
+2020-11-22 - v0.2
+	* wrappers running and callable  as dmalloc, dfree .....
+	- hang issue on nameing as malloc, free ...
+	*__attribute__((constructor)) not running reliably before first call
+	- call init() explicitly
+2020-11-21 - v0.1
+	* examples
+	- cat - shared lib to replace read()
+	- fishing - shared lib to replace read() then call through to original

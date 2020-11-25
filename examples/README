@@ -1,0 +1,80 @@
+The LD_PRELOAD trick
+
+These two example  programs are direct ports of samples presented by
+Peter Goldsborough at the following link.
+
+http://www.goldsborough.me/c/low-level/kernel/2016/08/29/16-48-53-the_-ld_preload-_trick/
+
+These two examples are used to understand the concepts of overriding
+functions in shared libraries and symbol fishing to call the original
+function. There are two examples, 'cats' and 'fishing'
+
+cats
+----
+cats is a simple program to read() some user-supplied text from the
+console and simply echo it back. Using the preload trick we supply an
+alternative definition of the read() function which always returns the
+striong "I love cats". To see it in action change in the 'cats'
+directory and type:
+
+	  make check
+
+Sample output is below. In the first case I have typed "Hello World"
+and it was echoed back to me. In the second case the program was
+invoked using the LD_PRELOAD trick (OS X equivalent in this case). The
+program doesn't wait for user input and simply states its love for cats.
+
+Run 1 with standard read call
+----------------------------
+./cats
+type some text:
+Hello World!
+you typed:
+Hello World!
+----------------------------
+
+Run 2 with injected read call
+----------------------------
+DYLD_INSERT_LIBRARIES=../src/libinject.dylib DYLD_FORCE_FLAT_NAMESPACE=1 ./cats
+type some text:
+you typed:
+I love cats
+----------------------------
+
+
+fish
+----
+fish is a simple program to read() some user-supplied text
+from the console and simply echo it back (same as cats). Using the
+preload trick we supply an alternative definition of the read()
+function which calls the real read() (via symbol fishing) then spys on
+the read data by printing it to standard out before returning to the
+main problem. To see it in action change in the 'cats' directory and
+type:
+
+	  make check
+
+Sample output is below. In the first case I have typed "howdy" and it
+was echoed back to me. In the second case the program was invoked
+using the LD_PRELOAD trick (OS X equivalent in this case). In the
+second case I also enter howdy but the spy version of read() wraps the
+real read() and spys on the data.
+
+Run 1 with standard read call
+----------------------------
+./fish
+type some text:
+howdy
+you typed:
+howdy
+----------------------------
+
+Run 2 with injected read call
+----------------------------
+DYLD_INSERT_LIBRARIES=../src/libspy.dylib DYLD_FORCE_FLAT_NAMESPACE=1 ./fish
+type some text:
+howdy
+intercepted read data: howdy
+you typed:
+howdy
+----------------------------
