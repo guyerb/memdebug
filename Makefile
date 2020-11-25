@@ -14,3 +14,4 @@ clean:
 
 distclean: clean
 	for d in $(subdirs); do [ -d $$d ] && $(MAKE) -C $$d distclean; done
+	rm -f cscope.*

@@ -1,7 +1,8 @@
-dmalloc library - version 1.0
+dmalloc library - see ChangeLog for version info
 
 INTRODUCTION
 LD_PRELOAD and SYMBOL FISHING
+API
 OUTPUT
 NOTES
 PROBLEMS
@@ -20,6 +21,11 @@ type:
 
 A variety of debug information will be printed on stderr every five
 seconds or thereabouts. More on output format in OUTPUT
+
+It is not necessary to recompile your application to use this library
+as it intercepts malloc type routines (see LD_PRELOAD below). There is
+a control API if you desire to explicitly link against the library and
+control aspects of its operation (see API below)
 
 ==================================================================
 LD_PRELOAD and SYMBOL FISHING
@@ -40,72 +46,62 @@ To see how preload and symbol fishing are accomplished under MAC OSX
 have a look at the 'check' target in test/Makefile and the source code
 for the library under 'src'
 
+==================================================================
+API
+
+TBD
+
 
 ==================================================================
 NOTES
 
 Current allocations by age: ( # = 8,123 current allocations)
+< 1 sec: ###
+< 10 sec: ##
+< 100 sec: ##
+< 1000 sec: ######################### > 1000 sec:
 
-The above is one of the suggested stat output lines. At first I was
-convinced that I would need to keep a list of all allocated pointers
-and the time they were allocated so that I could compute the age
-buckets. This seemed like a daunting task (space, time, and
-complexity).
 
-It would be great if we could just keep the counts in the buckets and
-graduate counts from one bucket to the next as time goes on. This also
-poses the problem of how to decrement the buckets. I think the
-decrement could be solved by allocating an extra time_t sized struct
-in each alloc such that on free, I could check that time and decrement
-the correct time bucket.
+The above is one of the stat output lines. At first I was convinced
+that I would need to keep a list of all allocated pointers and the
+time they were allocated so that I could compute the age buckets. This
+seemed like a daunting task (space, time, and complexity).
 
-The problem is figuring out how to move counts from one bucket to the
-next. For example, consider the less than one second bucket. Assuming
-that it has a count of ten. When the code tries to graduate items from
-one bucket to the next how does it know if an item has been in there
-for a tenth of a second or two seconds. It is just a count which loses
-the granularity of each particular item.
+Fortunately, there is an easier way. Keeping an array of 1000 entries
+is sufficient. Each "bucket" holds the count of allocations sharing
+that birthday. For instance, a count of 3 at index 4 (the 5th
+position) indicates we have 3 allocations that have persisted for five
+seconds. We update the list opportunistically and only if the elapsed
+time since the last update is more than one second.
 
-Basically we are watching up 1000 seconds, anything more than that is
-one bucket (the > 1000 bucket). If we break that 1000 seconds up into
-1000 slices that is 1s per slice. When a new alloc or free comes in
-then we check if it has been more than one second since the last
-update. If it has then we can round the time to the nearest 1s and
-march the list adjusting each bucket accordingly and then add our new
-item (assuming it was an alloc) to the first slice. We can track any
-accumulated error from the rounding and play that back into the nest
-time.
+There is a loss of accuracy in the first bucket. We don't know how
+long an allocation has really existed during that first second. It may
+have enetered that bucket only a few milliseconds before a one second
+boundary and then finds itself quickly promoted to the next
+bucket. For subsequent time slots all promotions are accurate,
+i.e. more errors don't accumulate.
 
-There is a 100ms inaccuracy introduces immediately because items in
-that first slice may have been added anywhere in a 1s window and may
-be promoted early. But each subsequent bucket basically has all items
-aligned at the same point in time. The other source of error is the
-caused by the rounding. This can be accumulated and be added to the
-next time and thus carried forward and minimized.
+We hide some birthday magic in extra bytes in the header of each
+allocation so that on free() we can decrement the count in the correct
+bucket.
 
-The final problem comes on the free(). We can store the time of the
-allocation in some extra memory stored in the allocation iteself. The
-problem then is reduced to determining accurately which slice needs to
-be decremented. We can compute which bucket it should be in but it may
-have been promoted and not be where we expect it (although it should
-be close). Close is actually good enough. If for instance, we believe
-the correct slice on a free() is slot 547 then does it really matter
-if the slice is really 546 or 548. Given the algorithm I am talking
-about it should be in on of those three.
+We do incur the cost of traversing a 1000 element list of integers to
+do the update so this should be undertaken only as needed but is not
+hugely expensive.
 
-Algorithm becomes:
+Algorithm becomes basically;
 
-new element arrives or free or time to log
-note time
-// advance slices by time + accumulated error
-if (last update > 1s) then
-   for (i=999; i>=0; i++)
-       slice[i+whole seconds] = slice[i]
-   endfor
-endif
-if alloc then increment slice[0]
-if freeO then decrement slice[x]
-do log if needed
+alloc()
+	new allocation
+	note birthday
+	update current list if last update more than one second ago
+	increment time 0 bucket
+
+free()
+	extract birthday
+	free allocation
+	decrement count at computed bucket
+
 
 ==================================================================
 PROBLEMS
@@ -137,9 +133,9 @@ malloc(23949,0x110734dc0) malloc: my_calloc: 0x7fd7de5044a0 = calloc(32 1)
 TODO
 
 	* realloc() - Currently realloc() statistics gathers treats a
-          realloc as a free followed by an alloc. This loses precision
-          on the lifetime of the allocation. A better implementation
-          might notice that the base pointer has not changed and
-          simnply update the total bytes allocated as a result.
+	  realloc as a free followed by an alloc. This loses precision
+	  on the lifetime of the allocation. A better implementation
+	  might notice that the base pointer has not changed and
+	  simnply update the total bytes allocated as a result.
 
 
