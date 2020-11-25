@@ -1,2 +1,7 @@
 cscope.*
 *~
+*.d
+*.o
+*.dSYM
+*.dylib
+*.so
