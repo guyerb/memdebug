@@ -19,7 +19,7 @@ endif
 	@gcc -MM $*.c > $*.d
 
 $(target): $(objects)
-	gcc -g  $^  -shared  -o $@
+	gcc -g  $^  -ldl -shared  -o $@
 
 check: $(target)
 
