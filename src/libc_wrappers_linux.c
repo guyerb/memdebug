@@ -19,70 +19,66 @@ static free_t	 libc_freep = NULL;
 static malloc_t	 libc_mallocp = NULL;
 static realloc_t libc_reallocp = NULL;
 
-static uint8_t buffer[1024];
-static uint8_t *pbuf = buffer + sizeof(size_t); /* leave room for birthday */
-
-static int inited = 0;
+/* memory for early allocations before we have resolved libc routines */
+#define DMALLOC_PREINIT_ROWS 10
+#define DMALLOC_PREINIT_SIZE 256
+static uint8_t dmalloc_preinit_buffer[DMALLOC_PREINIT_ROWS][DMALLOC_PREINIT_SIZE];
+static uint8_t dmalloc_row = 0;
 
 #define UNUSED(x) (void)(x)
 
-/* fishing for function pointers results in early calls to calloc, fake it */
-static void * my_calloc(size_t count, size_t size)
+static void * my_malloc(size_t size)
 {
-  UNUSED(count);
+  void *ptr;
   UNUSED(size);
-  
-  memset(buffer, 0, sizeof(buffer));
-  return pbuf;
-}
 
-/* fishing for function pointers results in early calls to realloc(?), fake it */
-static void * my_realloc(void *ptr, size_t size)
-{
-  UNUSED(ptr);
-  UNUSED(size);
-  
-  return pbuf;
+  ptr = &dmalloc_preinit_buffer[dmalloc_row][0];
+  dmalloc_row = (dmalloc_row + 1) % DMALLOC_PREINIT_ROWS;
+
+  return ptr;
 }
 
 void __attribute__ ((constructor)) libc_wrapper_init(void)
 {
-  dmalloc_printf("libc_wrapper_init\n");
-
   /* fish for pointers to actual malloc routines */
   libc_callocp = (calloc_t)dlsym(RTLD_NEXT, "calloc");
   libc_freep = (free_t)dlsym(RTLD_NEXT, "free");
   libc_mallocp = (malloc_t)dlsym(RTLD_NEXT, "malloc");
   libc_reallocp = (realloc_t)dlsym(RTLD_NEXT, "realloc");
-  inited = 1;
+  //  dmalloc_printf("c %p, f %c, mp % rp %p\n", libc_callocp, libc_freep, libc_mallocp, libc_reallocp);
 }
 
 void * libc_calloc_wrapper(size_t count, size_t size)
 {
-  if (!libc_callocp)
-    return my_calloc(count, size);
-  else
-    return libc_callocp(count, size);
+  return libc_callocp(count, size);
 }
 
 void libc_free_wrapper(void *ptr)
 {
-  if (ptr == buffer) return;
+  if (ptr >= (void *)dmalloc_preinit_buffer &&
+      ptr < (void *)(dmalloc_preinit_buffer + sizeof(dmalloc_preinit_buffer))) {
+    return;
+  }
+
   libc_freep(ptr);
 }
 
 void * libc_malloc_wrapper(size_t size)
 {
-  return libc_mallocp(size);
+  void *p;
+
+  if (!libc_mallocp) {
+    p = my_malloc(size);
+  } else {
+    p = libc_mallocp(size);
+  }
+  return p;
 }
 
 void * libc_realloc_wrapper(void *ptr, size_t size)
 {
   void *p;
-  
-  if (!inited)
-    p = my_realloc(ptr, size);
-  else
-    p = libc_reallocp(ptr, size);
-  return p; 
+
+  p = libc_reallocp(ptr, size);
+  return p;
 }

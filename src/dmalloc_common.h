@@ -50,4 +50,9 @@ static inline size_t dmalloc_extrabytes_get(void *ptr)
   return extra;
 }
 
+static inline void * dmalloc_basepointer_get(void *ptr)
+{
+  return (time_t *)ptr - 1;
+}
+
 #endif	/* DMALLOC_COMMON_H */

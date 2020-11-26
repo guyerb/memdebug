@@ -7,23 +7,24 @@
 
 int main()
 {
-  char buffer[1000];
-  unsigned long amount_read;
-  int fd;
+  /* char buffer[1000]; */
+  /* unsigned long amount_read; */
+  /* int fd; */
 
+  putc('P', stderr);
   char *p = malloc(12);
   free(p);
   
-  printf("type some text:\n");
-  fd = fileno(stdin);
+  /* printf("type some text:\n"); */
+  /* fd = fileno(stdin); */
 
-  amount_read = read(fd, buffer, sizeof buffer);
+  /* amount_read = read(fd, buffer, sizeof buffer); */
 
-  printf("you typed:\n");
-  if (fwrite(buffer, sizeof(char), amount_read, stdout) != amount_read) {
-    perror("error writing");
-    return EXIT_FAILURE;
-  }
+  /* printf("you typed:\n"); */
+  /* if (fwrite(buffer, sizeof(char), amount_read, stdout) != amount_read) { */
+  /*   perror("error writing"); */
+  /*   return EXIT_FAILURE; */
+  /* } */
 
   return EXIT_SUCCESS;
 }

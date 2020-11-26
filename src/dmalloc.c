@@ -28,10 +28,9 @@ void * dmalloc_calloc_intercept(size_t count, size_t size)
 
 void dmalloc_free_intercept(void *ptr)
 {
-  dmalloc_printf("dmalloc_free\n");
 
-  dmalloc_stats_newfree(ptr, dmalloc_usable_size(ptr), dmalloc_extrabytes_get(ptr));
-  libc_free_wrapper(ptr);
+  //  dmalloc_stats_newfree(ptr, dmalloc_usable_size(ptr), dmalloc_extrabytes_get(ptr));
+  libc_free_wrapper(dmalloc_basepointer_get(ptr));
 
   return;
 }
@@ -40,13 +39,11 @@ void * dmalloc_malloc_intercept(size_t size)
 {
   void *ptr;
 
-  dmalloc_printf("dmalloc_malloc\n");
-
   /* alloc bytes and hide our birthday inside */
   ptr = libc_malloc_wrapper(size + dmalloc_extrabytes_sz());
   ptr = dmalloc_extrabytes_setandhide(ptr, time(NULL));
 
-  dmalloc_stats_newalloc(ptr, dmalloc_usable_size(ptr));
+  //dmalloc_stats_newalloc(ptr, dmalloc_usable_size(ptr));
 
   return ptr;
 }
@@ -56,8 +53,7 @@ void * dmalloc_realloc_intercept(void *ptr, size_t size)
 {
   void *p;
 
-  dmalloc_printf("dmalloc_realloc\n");
-
+  //  dmalloc_printf("dmalloc_realloc\n");
   dmalloc_stats_newfree(ptr, dmalloc_usable_size(ptr), dmalloc_extrabytes_get(ptr));
 
   /* alloc bytes and hide birthday inside */
