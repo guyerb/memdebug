@@ -1,3 +1,4 @@
+from src do make --warn-undefined-variables -f Makefile.unit unit
 
 docker build . -t ubuntu-dev
 docker run -it -v `pwd`:/home/ubuntu/dev ubuntu-dev:latest
