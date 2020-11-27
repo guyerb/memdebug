@@ -19,4 +19,4 @@ unit: dmalloc_stats.o
 	gcc -g  $^  -o $@	
 
 clean:
-	rm -f *.o *.d *~
+	rm -f *.o *.d *~ unit

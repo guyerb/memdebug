@@ -203,6 +203,8 @@ void dmalloc_stats_clear(void)
 #ifdef DMALLOC_STATS_UNIT
 int main()
 {
+  time_t t1 = time(NULL);
+    
   printf("dmalloc stat unit tests:\n\n");
   dmalloc_stats_start("exercise size_bucket_ndx()");
   dmalloc_stats_check("malloc of 0 bytes", 0, size_bucket_ndx(0));
@@ -227,7 +229,6 @@ int main()
   dmalloc_stats_delim();
   /* ------------------------------------------------------------------------- */
   dmalloc_stats_start("exercise age and size buckets");
-  time_t t1 = time(NULL);
   dmalloc_stats_clear();
   dmalloc_stats_alloc(0, t1);
   dmalloc_stats_alloc(1, t1);
@@ -244,12 +245,22 @@ int main()
   dmalloc_stats_alloc(2048, t1);
   dmalloc_stats_alloc(4096, t1);
   dmalloc_stats_alloc(8192, t1);
+  dmalloc_stats_check("age  bucket 0", 15, stats.s_agebuckets[BUCKET_0000]);
+  
+  dmalloc_stats_check("size bucket 0", 1, stats.s_sizebuckets[BUCKET_0000]);
+  dmalloc_stats_check("size bucket 1", 1, stats.s_sizebuckets[BUCKET_0004]);
+  dmalloc_stats_check("size bucket 2", 1, stats.s_sizebuckets[BUCKET_0008]);
+  dmalloc_stats_check("size bucket 3", 1, stats.s_sizebuckets[BUCKET_0016]);
+  dmalloc_stats_check("size bucket 4", 1, stats.s_sizebuckets[BUCKET_0032]);
+  dmalloc_stats_check("size bucket 5", 1, stats.s_sizebuckets[BUCKET_0064]);
+  dmalloc_stats_check("size bucket 6", 1, stats.s_sizebuckets[BUCKET_0128]);	
+  dmalloc_stats_check("size bucket 7", 1, stats.s_sizebuckets[BUCKET_0256]);
+  dmalloc_stats_check("size bucket 8", 1, stats.s_sizebuckets[BUCKET_0512]);
+  dmalloc_stats_check("size bucket 9", 1, stats.s_sizebuckets[BUCKET_1024]);
+  dmalloc_stats_check("size bucket 10", 1, stats.s_sizebuckets[BUCKET_2048]);
+  dmalloc_stats_check("size bucket 11", 2, stats.s_sizebuckets[BUCKET_4096]);
   dmalloc_stats_delim();
-  
-  
+
   /* ------------------------------------------------------------------------- */
-  
-
-
 }
 #endif	/* DMALLOC_STATS_UNIT */
