@@ -107,7 +107,7 @@ NOTES - REENTRANCY
 As we process an allocation call, things like printf() and other
 routines call internally call more alloc() routine causing us to
 reenter ourselves. If we block then we hang the library. To prevent
-this we acknoweldge that we are reentant and take steps to prevent
+this we acknoweldge that we are reentrant and take steps to prevent
 issues. Namely, upon entry to a routine we note if we are already in
 the library via some flag and if so then we simply call through to the
 libc routine without doing any more processing. This will allow any
