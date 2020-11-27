@@ -21,8 +21,8 @@
 #define dmalloc_usable_size malloc_size
 #endif
 
-extern void dmalloc_stats_newalloc(void *ptr, size_t sz, time_t now);
-extern void dmalloc_stats_newfree(void *ptr, size_t sz, time_t now);
+extern void dmalloc_stats_alloc(void *ptr, size_t sz, time_t now);
+extern void dmalloc_stats_free(void *ptr, size_t sz, time_t now);
 extern void dmalloc_printf( const char* format, ... );
 
 static inline size_t dmalloc_extrabytes_sz()
