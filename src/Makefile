@@ -1,6 +1,6 @@
 # -*- MakeFile -*-
 
-objects := dmalloc.o dmalloc_stat.o dmalloc_api.o dmalloc_common.o
+objects := dmalloc.o dmalloc_stats.o dmalloc_api.o dmalloc_common.o
 depends := $(objects:.o=.d)
 
 uname := $(shell uname -s)

@@ -19,8 +19,9 @@ static free_t	 libc_freep = NULL;
 static malloc_t	 libc_mallocp = NULL;
 static realloc_t libc_reallocp = NULL;
 
-/* memory for early allocations before we have resolved libc routines */
-#define DMALLOC_PREINIT_ROWS 10
+/* my_malloc() - simple memory for early allocations from dlym(),
+   before we have resolved libc routines */
+#define DMALLOC_PREINIT_ROWS 5
 #define DMALLOC_PREINIT_SIZE 256
 static uint8_t dmalloc_preinit_buffer[DMALLOC_PREINIT_ROWS][DMALLOC_PREINIT_SIZE];
 static uint8_t dmalloc_row = 0;
@@ -41,11 +42,12 @@ static void * my_malloc(size_t size)
 void __attribute__ ((constructor)) libc_wrapper_init(void)
 {
   /* fish for pointers to actual malloc routines */
+  putc('!', stderr);
   libc_callocp = (calloc_t)dlsym(RTLD_NEXT, "calloc");
   libc_freep = (free_t)dlsym(RTLD_NEXT, "free");
   libc_mallocp = (malloc_t)dlsym(RTLD_NEXT, "malloc");
   libc_reallocp = (realloc_t)dlsym(RTLD_NEXT, "realloc");
-  //  dmalloc_printf("c %p, f %c, mp % rp %p\n", libc_callocp, libc_freep, libc_mallocp, libc_reallocp);
+  dmalloc_printf("c %p, f %p, m %p r %p\n", libc_callocp, libc_freep, libc_mallocp, libc_reallocp);
 }
 
 void * libc_calloc_wrapper(size_t count, size_t size)
@@ -57,9 +59,10 @@ void libc_free_wrapper(void *ptr)
 {
   if (ptr >= (void *)dmalloc_preinit_buffer &&
       ptr < (void *)(dmalloc_preinit_buffer + sizeof(dmalloc_preinit_buffer))) {
+    putc('e', stderr);
     return;
   }
-
+  putc('F', stderr);
   libc_freep(ptr);
 }
 
@@ -68,8 +71,10 @@ void * libc_malloc_wrapper(size_t size)
   void *p;
 
   if (!libc_mallocp) {
+    putc('E', stderr);
     p = my_malloc(size);
   } else {
+    putc('M', stderr);
     p = libc_mallocp(size);
   }
   return p;
@@ -79,6 +84,7 @@ void * libc_realloc_wrapper(void *ptr, size_t size)
 {
   void *p;
 
+  putc('R', stderr);
   p = libc_reallocp(ptr, size);
   return p;
 }

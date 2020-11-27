@@ -5,28 +5,29 @@
 #include <sys/queue.h>
 
 enum bucket_index {
-  BUCKET_4096, BUCKET_2048, BUCKET_1024, BUCKET_0512, BUCKET_0256,
-  BUCKET_0128, BUCKET_0064, BUCKET_0032, BUCKET_0016, BUCKET_0008,
-  BUCKET_0004, BUCKET_0000
+  BUCKET_0000, BUCKET_0004, BUCKET_0008, BUCKET_0016, BUCKET_0032, BUCKET_0064,
+  BUCKET_0128, BUCKET_0256, BUCKET_0512, BUCKET_1024, BUCKET_2048, BUCKET_4096,
 };
-#define BUCKETS_SIZE 12
-
-#define BUCKETS_AGE  1000
+#define BUCKETS_NDX_NUM 12	/* N.B. make sure to adjust if you increase enums above */
+#define BUCKETS_AGE_NUM  1000
 
 struct dmalloc_stats {
-  uint64_t s_allocated_current;
-  uint64_t a_allocated_alltime;
-  uint32_t s_buckets_size[BUCKETS_SIZE];
-  uint32_t s_buckets_age[BUCKETS_AGE];
-  time_t   s_buckets_age_lastupdate;
+  uint32_t s_allocated_current;
+  uint32_t s_allocated_alltime;
+  uint32_t s_buckets_size[BUCKETS_NDX_NUM];
+  uint32_t s_buckets_age[BUCKETS_AGE_NUM];
   uint32_t s_null_frees;
   uint32_t s_failed_allocs;
-  uint32_t  s_invalid_birthdays;
+  uint32_t s_invalid_birthdays;
+  time_t   s_buckets_age_lastupdate;
+
+  /* internal debugging */
+  uint32_t _s_failed_malloc_locks;
 };
 
 static struct dmalloc_stats stats = {0};
 
-/*  
+/*
  * we monitor the age of each allocation by grouping them in buckets,
  * where each bucket represents one second of age. We bump them
  * forward by elapsed time since last update. For a full discussion
@@ -44,13 +45,13 @@ static void dmalloc_age_buckets_update()
   pthread_mutex_unlock(&mutex);
 
   if (elapsed > 0) {
-    for (int i = BUCKETS_AGE; i > 0; i--) {
+    for (int i = BUCKETS_AGE_NUM; i > 0; i--) {
       int src_ndx = i - 1;
       int dst_ndx = src_ndx + elapsed;
       time_t src_val = stats.s_buckets_age[src_ndx];
 
       if (src_val) stats.s_buckets_age[src_ndx] = 0;
-      
+
       if (src_ndx == 999) continue;	/* bucket 1000 doesn't age */
 
       if (dst_ndx >= 999)
@@ -88,7 +89,7 @@ static void dmalloc_age_bucket_delete(time_t birth)
 
   for (int i = age; i <= 999; i++) {
     int death = 0;
-    
+
     pthread_mutex_lock(&mutex);
     if (stats.s_buckets_age[i] != 0) {
       stats.s_buckets_age[i]--;
@@ -99,7 +100,7 @@ static void dmalloc_age_bucket_delete(time_t birth)
   }
 }
 
-static size_t size_bucket_index(size_t sz)
+static int size_bucket_ndx(size_t sz)
 {
   if (sz >= 0x1000)
     return BUCKET_4096;
@@ -129,17 +130,21 @@ static size_t size_bucket_index(size_t sz)
 void dmalloc_stats_newalloc(void *ptr, size_t sz)
 {
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-  int bucket = size_bucket_index(sz);
 
-  pthread_mutex_lock(&mutex);
-  if (ptr) {
-    stats.a_allocated_alltime += sz;
-    stats.s_allocated_current += sz;
-    stats.s_buckets_size[bucket]++;
+  if (pthread_mutex_lock(&mutex) == 0) {
+    if (ptr) {
+      int ndx = size_bucket_ndx(sz);
+
+      stats.s_allocated_alltime += sz;
+      stats.s_allocated_current += sz;
+      stats.s_buckets_size[ndx]++;
+    } else {
+      stats.s_failed_allocs++;
+    }
+    pthread_mutex_unlock(&mutex);
   } else {
-    stats.s_failed_allocs++;
+    stats._s_failed_malloc_locks++;
   }
-  pthread_mutex_unlock(&mutex);
 
   dmalloc_age_buckets_update();
   dmalloc_age_bucket_insert();
@@ -150,7 +155,7 @@ void dmalloc_stats_newalloc(void *ptr, size_t sz)
 void dmalloc_stats_newfree(void *ptr, size_t sz, time_t birth)
 {
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-  int bucket = size_bucket_index(sz);
+  int bucket = size_bucket_ndx(sz);
 
   pthread_mutex_lock(&mutex);
   if (ptr) {
@@ -166,3 +171,70 @@ void dmalloc_stats_newfree(void *ptr, size_t sz, time_t birth)
   return;
 }
 
+/* --------------------------------------------------------------------------- */
+
+static int unit_total;
+static int unit_passed;
+static int unit_failed;
+
+void dmalloc_stats_delim()
+{
+  printf("unit total tests %d passed %d failed %d\n", unit_total, unit_passed, unit_failed);
+
+  unit_total = 0;
+  unit_failed = 0;
+  unit_passed = 0;
+}
+
+void dmalloc_stats_start( char *descr)
+{
+  puts("------------------------------------------------------------------------------");
+  printf("%s:\n", descr);
+}
+
+void dmalloc_stats_check(char *descr, uint32_t expected, uint32_t actual)
+{
+  int passed = (expected == actual);
+
+  unit_total++;
+  if (passed) unit_passed++;
+  else unit_failed++;
+
+  printf("%-30s %-8s expected %10u actual %10u\n", descr, passed ? "PASSED" : "FAILED", expected, actual);
+}
+
+#ifdef DMALLOC_STATS_UNIT
+int main()
+{
+  printf("dmalloc stat unit tests:\n\n");
+  dmalloc_stats_start("exercise size_bucket_ndx()");
+  dmalloc_stats_check("malloc of 0 bytes", 0, size_bucket_ndx(0));
+  dmalloc_stats_check("malloc of 1 bytes", 0, size_bucket_ndx(1));
+  dmalloc_stats_check("malloc of 2 bytes", 0, size_bucket_ndx(2));
+  dmalloc_stats_check("malloc of 3 bytes", 0, size_bucket_ndx(3));
+  dmalloc_stats_check("malloc of 4 bytes", 1, size_bucket_ndx(4));
+  dmalloc_stats_check("malloc of 5 bytes", 1, size_bucket_ndx(5));
+  dmalloc_stats_check("malloc of 6 bytes", 1, size_bucket_ndx(6));
+  dmalloc_stats_check("malloc of 7 bytes", 1, size_bucket_ndx(7));
+  dmalloc_stats_check("malloc of 8 bytes", 2, size_bucket_ndx(8));
+  dmalloc_stats_check("malloc of 15 bytes", 2, size_bucket_ndx(15));
+  dmalloc_stats_check("malloc of 2047 bytes", 9, size_bucket_ndx(2047));
+  dmalloc_stats_check("malloc of 2049 bytes", 10, size_bucket_ndx(2049));
+  dmalloc_stats_check("malloc of 4095 bytes", 10, size_bucket_ndx(4095));
+  dmalloc_stats_check("malloc of 4096 bytes", 11, size_bucket_ndx(4096));
+  dmalloc_stats_check("malloc of 4097 bytes", 11, size_bucket_ndx(4097));
+  dmalloc_stats_check("malloc of 1234567 bytes", 11, size_bucket_ndx(1234567));
+  dmalloc_stats_delim();
+
+  dmalloc_stats_start("exercise failed malloc and basic lock");
+  dmalloc_stats_check("s_failed_allocs", 0, stats.s_failed_allocs);
+  dmalloc_stats_check("_s_failed_malloc_locks", 0, stats._s_failed_malloc_locks);
+  dmalloc_stats_newalloc(NULL, 12);
+  dmalloc_stats_check("s_failed_allocs", 1, stats.s_failed_allocs);
+  dmalloc_stats_check("_s_failed_malloc_locks", 0, stats._s_failed_malloc_locks);
+  dmalloc_stats_delim();
+
+
+
+}
+#endif	/* DMALLOC_STATS_UNIT */

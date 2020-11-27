@@ -5,3 +5,5 @@ cscope.*
 *.dSYM
 *.dylib
 *.so
+unit
+checks

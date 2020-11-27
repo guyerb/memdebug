@@ -39,12 +39,16 @@ void * dmalloc_malloc_intercept(size_t size)
 {
   void *ptr;
 
+  putc('M', stderr);
+  dmalloc_printf("%s\n", __func__);
+
   /* alloc bytes and hide our birthday inside */
   ptr = libc_malloc_wrapper(size + dmalloc_extrabytes_sz());
   ptr = dmalloc_extrabytes_setandhide(ptr, time(NULL));
 
   //dmalloc_stats_newalloc(ptr, dmalloc_usable_size(ptr));
 
+  putc('.', stderr);
   return ptr;
 }
 
