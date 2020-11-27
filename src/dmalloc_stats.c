@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <pthread.h>
 #include <time.h>
 #include <sys/queue.h>
@@ -15,16 +16,16 @@ enum bucket_index {
 struct dmalloc_stats {
   uint32_t s_allocated_current;
   uint32_t s_allocated_alltime;
-  uint32_t s_buckets_size[BUCKETS_NDX_NUM];
-  uint32_t s_buckets_age[BUCKETS_AGE_NUM];
+  uint32_t s_sizebuckets[BUCKETS_NDX_NUM]; /* allocations by size */
+  uint32_t s_agebuckets[BUCKETS_AGE_NUM];  /* allocations by age (seconds) */
   uint32_t s_null_frees;
   uint32_t s_failed_allocs;
   uint32_t s_invalid_birthdays;
-  time_t   s_buckets_age_lastupdate;
+  time_t   s_agebuckets_lastupdate;
 
   /* internal debugging */
-  uint32_t _s_failed_malloc_locks;
-  uint32_t _s_buckets_age_delete_error;
+  uint32_t _s_agebuckets_delete_error;
+  uint32_t _s_lockerror;
 };
 
 static struct dmalloc_stats stats = {0};
@@ -35,44 +36,45 @@ static struct dmalloc_stats stats = {0};
  * forward by elapsed time since last update. For a full discussion
  * see NOTES sections of top-level README.
  */
-static void dmalloc_age_buckets_update(time_t now)
+static void dmalloc_agebuckets_update(time_t now)
 {
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
   time_t elapsed;
 
-  pthread_mutex_lock(&mutex);
-  elapsed = now - stats.s_buckets_age_lastupdate;
-  stats.s_buckets_age_lastupdate = now;
-  pthread_mutex_unlock(&mutex);
+  if (pthread_mutex_lock(&mutex) == 0) {
+    elapsed = now - stats.s_agebuckets_lastupdate;
+    stats.s_agebuckets_lastupdate = now;
+    pthread_mutex_unlock(&mutex);
 
-  if (elapsed > 0) {
-    for (int i = BUCKETS_AGE_NUM; i > 0; i--) {
-      int src_ndx = i - 1;
-      int dst_ndx = src_ndx + elapsed;
-      time_t src_val = stats.s_buckets_age[src_ndx];
+    if (elapsed > 0) {
+      for (int i = BUCKETS_AGE_NUM; i > 0; i--) {
+	int src_ndx = i - 1;
+	int dst_ndx = src_ndx + elapsed;
+	time_t src_val = stats.s_agebuckets[src_ndx];
 
-      if (src_val) stats.s_buckets_age[src_ndx] = 0;
-
-      if (src_ndx == 999) continue;	/* bucket 1000 doesn't age */
-
-      if (dst_ndx >= 999)
-	stats.s_buckets_age[999] += src_val;
-      else
-	stats.s_buckets_age[dst_ndx] = src_val; /* not +- cuz residents moved */
+	if (src_val) stats.s_agebuckets[src_ndx] = 0;
+	if (src_ndx == 999) continue;	/* bucket 1000 doesn't age */
+	if (dst_ndx >= 999)
+	  stats.s_agebuckets[999] += src_val;
+	else
+	  stats.s_agebuckets[dst_ndx] = src_val; /* not +- cuz residents moved */
+      }
     }
+  } else {
+    stats._s_lockerror++;
   }
 }
 
-static void dmalloc_age_bucket_insert()
+static void dmalloc_agebucket_insert()
 {
-  stats.s_buckets_age[0]++;
+  stats.s_agebuckets[0]++;
 }
 /* This element was allocated sometime in the past as indicated by
    age. We can determine how old it is by subtracting the current time
    from that age then compute the bucket index. If we don't find any
    elements in that bucket we will proceed down the list and decrease
    the population by one at the next populated bucket */
-static void dmalloc_age_bucket_delete(time_t now, time_t birth)
+static void dmalloc_agebucket_delete(time_t now, time_t birth)
 {
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
   time_t age;
@@ -86,10 +88,10 @@ static void dmalloc_age_bucket_delete(time_t now, time_t birth)
   if (age > 999) age = 999;
 
   pthread_mutex_lock(&mutex);
-  if (stats.s_buckets_age[age] != 0) {
-    stats.s_buckets_age[age]--;
+  if (stats.s_agebuckets[age] != 0) {
+    stats.s_agebuckets[age]--;
   } else {
-    stats._s_buckets_age_delete_error++;
+    stats._s_agebuckets_delete_error++;
   }
   pthread_mutex_lock(&mutex);
 }
@@ -121,27 +123,23 @@ static int size_bucket_ndx(size_t sz)
   return BUCKET_0000;
 }
 
-void dmalloc_stats_alloc(void *ptr, size_t sz, time_t now)
+void dmalloc_stats_alloc(size_t sz, time_t now)
 {
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
   if (pthread_mutex_lock(&mutex) == 0) {
-    if (ptr) {
       int ndx = size_bucket_ndx(sz);
 
       stats.s_allocated_alltime += sz;
       stats.s_allocated_current += sz;
-      stats.s_buckets_size[ndx]++;
-    } else {
-      stats.s_failed_allocs++;
-    }
-    pthread_mutex_unlock(&mutex);
+      stats.s_sizebuckets[ndx]++;
+      pthread_mutex_unlock(&mutex);
   } else {
-    stats._s_failed_malloc_locks++;
-  }
+        stats._s_lockerror++;
+ }
 
-  dmalloc_age_buckets_update(now);
-  dmalloc_age_bucket_insert();
+  dmalloc_agebuckets_update(now);
+  dmalloc_agebucket_insert();
 
   return;
 }
@@ -154,13 +152,13 @@ void dmalloc_stats_free(void *ptr, size_t sz, time_t birth)
   pthread_mutex_lock(&mutex);
   if (ptr) {
     stats.s_allocated_current -= sz;
-    stats.s_buckets_size[bucket]--;
+    stats.s_sizebuckets[bucket]--;
   } else {
-    stats.s_failed_allocs++;
+    stats.s_null_frees++;
   }
   pthread_mutex_unlock(&mutex);
 
-  dmalloc_age_bucket_delete(birth, time(NULL));
+  dmalloc_agebucket_delete(birth, time(NULL));
 
   return;
 }
@@ -197,6 +195,11 @@ void dmalloc_stats_check(char *descr, uint32_t expected, uint32_t actual)
   printf("%-30s %-8s expected %10u actual %10u\n", descr, passed ? "PASSED" : "FAILED", expected, actual);
 }
 
+void dmalloc_stats_clear(void)
+{
+  memset(&stats, 0, (sizeof(struct dmalloc_stats)));
+}
+
 #ifdef DMALLOC_STATS_UNIT
 int main()
 {
@@ -221,18 +224,31 @@ int main()
   dmalloc_stats_delim();
   /* ------------------------------------------------------------------------- */
   dmalloc_stats_start("exercise failed malloc and basic lock");
-  dmalloc_stats_check("s_failed_allocs", 0, stats.s_failed_allocs);
-  dmalloc_stats_check("_s_failed_malloc_locks", 0, stats._s_failed_malloc_locks);
-  dmalloc_stats_alloc(NULL, 12, time(NULL));
-  dmalloc_stats_check("s_failed_allocs", 1, stats.s_failed_allocs);
-  dmalloc_stats_check("_s_failed_malloc_locks", 0, stats._s_failed_malloc_locks);
   dmalloc_stats_delim();
   /* ------------------------------------------------------------------------- */
-  dmalloc_stats_start("exercise failed malloc and basic lock");
+  dmalloc_stats_start("exercise age and size buckets");
+  time_t t1 = time(NULL);
+  dmalloc_stats_clear();
+  dmalloc_stats_alloc(0, t1);
+  dmalloc_stats_alloc(1, t1);
+  dmalloc_stats_alloc(2, t1);
+  dmalloc_stats_alloc(4, t1);
+  dmalloc_stats_alloc(8, t1);
+  dmalloc_stats_alloc(16, t1);
+  dmalloc_stats_alloc(32, t1);
+  dmalloc_stats_alloc(64, t1);
+  dmalloc_stats_alloc(128, t1);
+  dmalloc_stats_alloc(256, t1);
+  dmalloc_stats_alloc(512, t1);
+  dmalloc_stats_alloc(1024, t1);
+  dmalloc_stats_alloc(2048, t1);
+  dmalloc_stats_alloc(4096, t1);
+  dmalloc_stats_alloc(8192, t1);
   dmalloc_stats_delim();
+  
+  
   /* ------------------------------------------------------------------------- */
   
-
 
 
 }

@@ -20,9 +20,10 @@ void * dmalloc_calloc_intercept(size_t count, size_t size)
   dmalloc_printf("dmalloc_calloc\n");
   /* alloc bytes and hide our birthday inside */
   ptr = libc_calloc_wrapper(count, size + dmalloc_extrabytes_sz());
-  ptr = dmalloc_extrabytes_setandhide(ptr, now);
-
-  dmalloc_stats_alloc(ptr, dmalloc_usable_size(ptr), now);
+  if (ptr) {
+    ptr = dmalloc_extrabytes_setandhide(ptr, now);
+    dmalloc_stats_alloc(dmalloc_usable_size(ptr), now);
+  }
 
   return ptr;
 }
@@ -64,9 +65,11 @@ void * dmalloc_realloc_intercept(void *ptr, size_t size)
 
   /* alloc bytes and hide birthday inside */
   p = libc_realloc_wrapper(ptr, size + dmalloc_extrabytes_sz());
-  p = dmalloc_extrabytes_setandhide(ptr, time(NULL));
 
-  dmalloc_stats_alloc(p, dmalloc_usable_size(p), now);
+  if (p) {
+    p = dmalloc_extrabytes_setandhide(ptr, time(NULL));
+    dmalloc_stats_alloc(dmalloc_usable_size(p), now);
+  }
 
   return p;
 }
