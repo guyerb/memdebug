@@ -33,13 +33,12 @@ static struct dmalloc_stats stats = {0};
  * forward by elapsed time since last update. For a full discussion
  * see NOTES sections of top-level README.
  */
-static void dmalloc_age_buckets_update()
+static void dmalloc_age_buckets_update(time_t now)
 {
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-  time_t elapsed, now;
+  time_t elapsed;
 
   pthread_mutex_lock(&mutex);
-  now = time(NULL);
   elapsed = now - stats.s_buckets_age_lastupdate;
   stats.s_buckets_age_lastupdate = now;
   pthread_mutex_unlock(&mutex);
@@ -71,20 +70,17 @@ static void dmalloc_age_bucket_insert()
    from that age then compute the bucket index. If we don't find any
    elements in that bucket we will proceed down the list and decrease
    the population by one at the next populated bucket */
-static void dmalloc_age_bucket_delete(time_t birth)
+static void dmalloc_age_bucket_delete(time_t now, time_t birth)
 {
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-  time_t age, now;
-
-  now = time(NULL);
+  time_t age;
 
   if (birth > now) {
     stats.s_invalid_birthdays++;
     return;
   }
 
-  age = time(NULL) - birth;
-
+  age = now - birth;
   if (age > 999) age = 999;
 
   for (int i = age; i <= 999; i++) {
@@ -127,7 +123,7 @@ static int size_bucket_ndx(size_t sz)
   return BUCKET_0000;
 }
 
-void dmalloc_stats_newalloc(void *ptr, size_t sz)
+void dmalloc_stats_newalloc(void *ptr, size_t sz, time_t now)
 {
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -146,7 +142,7 @@ void dmalloc_stats_newalloc(void *ptr, size_t sz)
     stats._s_failed_malloc_locks++;
   }
 
-  dmalloc_age_buckets_update();
+  dmalloc_age_buckets_update(now);
   dmalloc_age_bucket_insert();
 
   return;
@@ -166,7 +162,7 @@ void dmalloc_stats_newfree(void *ptr, size_t sz, time_t birth)
   }
   pthread_mutex_unlock(&mutex);
 
-  dmalloc_age_bucket_delete(birth);
+  dmalloc_age_bucket_delete(birth, time(NULL));
 
   return;
 }
@@ -225,14 +221,19 @@ int main()
   dmalloc_stats_check("malloc of 4097 bytes", 11, size_bucket_ndx(4097));
   dmalloc_stats_check("malloc of 1234567 bytes", 11, size_bucket_ndx(1234567));
   dmalloc_stats_delim();
-
+  /* ------------------------------------------------------------------------- */
   dmalloc_stats_start("exercise failed malloc and basic lock");
   dmalloc_stats_check("s_failed_allocs", 0, stats.s_failed_allocs);
   dmalloc_stats_check("_s_failed_malloc_locks", 0, stats._s_failed_malloc_locks);
-  dmalloc_stats_newalloc(NULL, 12);
+  dmalloc_stats_newalloc(NULL, 12, time(NULL));
   dmalloc_stats_check("s_failed_allocs", 1, stats.s_failed_allocs);
   dmalloc_stats_check("_s_failed_malloc_locks", 0, stats._s_failed_malloc_locks);
   dmalloc_stats_delim();
+  /* ------------------------------------------------------------------------- */
+  dmalloc_stats_start("exercise failed malloc and basic lock");
+  dmalloc_stats_delim();
+  /* ------------------------------------------------------------------------- */
+  
 
 
 
