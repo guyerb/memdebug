@@ -1,0 +1,22 @@
+# -*- MakeFile -*-
+# 
+# unit test for stat subsystem
+#
+
+uname := $(shell uname -s)
+ifeq ($(uname), Linux)
+	os = LINUX
+endif
+ifeq ($(uname), Darwin)
+	os = DARWIN
+endif
+
+dmalloc_stats.o: dmalloc_stats.c
+	gcc -g -std=c99 -Wall -Wextra -D DMALLOC_STATS_UNIT -D $(os) -c  $<  -o $@
+	@gcc -MM $*.c > $*.d
+
+unit: dmalloc_stats.o
+	gcc -g  $^  -o $@	
+
+clean:
+	rm -f *.o *.d *~
