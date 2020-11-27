@@ -22,7 +22,7 @@
 #endif
 
 extern void dmalloc_stats_alloc(size_t sz, time_t now);
-extern void dmalloc_stats_free(void *ptr, size_t sz, time_t now);
+extern void dmalloc_stats_free(void *ptr, size_t sz, time_t now, time_t birth);
 extern void dmalloc_printf( const char* format, ... );
 
 static inline size_t dmalloc_extrabytes_sz()

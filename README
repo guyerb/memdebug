@@ -121,7 +121,16 @@ TBD
 ==================================================================
 PROBLEMS
 
-Tracking total allocated bytes can be very tricky as many short lived
+* CORRUPT BIRTHDAYS
+
+The code as written hides a birthday timestamp in a user
+allocation. There is no 'magic' in that stamp to recognize if it is
+valid or corrupted and the free() code will happily attempt to use
+whatever it finds there albeit with some basic validity checking.
+
+
+* TRACKING TOTALS
+Tracking total allocated bytes can be very tricky as come short lived
 programs do not free() allocated memory and instead run to completion
 and count on the OS to simply free any allocated heap areas. Thus a
 simple Hello World program can easily show many mallocs without
