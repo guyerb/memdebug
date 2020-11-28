@@ -25,15 +25,11 @@ extern void dmalloc_stats_alloc(size_t, time_t);
 extern void dmalloc_stats_free(size_t, time_t, time_t);
 extern void dmalloc_printf( const char* format, ... );
 extern void dmalloc_logf( const char* format, ... );
+extern void dmalloc_log_protect();
+extern void dmalloc_log_unprotect();
 
-extern void dmalloc_stats_log();
 
-#ifdef DMALLOC_UNIT_TEST
-extern void dmalloc_ut_logging();
-extern void dmalloc_ut_delim();
-extern void dmalloc_ut_start(char *);
-extern void dmalloc_ut_check(char *, uint32_t, uint32_t);
-#endif
+extern void dmalloc_log_stats(); /* output the report. */
 
 static inline size_t dmalloc_extrabytes_sz()
 {

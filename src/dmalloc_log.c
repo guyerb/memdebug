@@ -10,7 +10,7 @@
 #include "dmalloc_common.h"
 #include "dmalloc_stats.h"
 
-int dmalloc_is_logging = 1;
+static struct dmalloc_alloc_stats stats = {0};
 
 /* search the array p for the biggest entry and decide how many
    entries per 'mark' should be displayed in provided columns e.g. if
@@ -109,9 +109,8 @@ void logline_commas (uint32_t n)
     dmalloc_logf (",%03d", n%1000);
 }
 
-void dmalloc_stats_log()
+void dmalloc_log_stats()
 {
-  struct dmalloc_alloc_stats stats;
   time_t now = time(NULL);
   struct tm *pgm = NULL;
   char * pgm_str = NULL;
@@ -132,7 +131,7 @@ void dmalloc_stats_log()
 
   pgm_str[24] = '\0'; 		/* kill the newline with bravado */
 
-  dmalloc_is_logging = 1;
+  dmalloc_log_protect();
   
   dmalloc_logf("========== %s: UTC %s ==========\n", DMALLOC_VERSION_STRING, pgm_str);
   dmalloc_logf("%-26s", "overall allocations:" );
@@ -183,13 +182,63 @@ void dmalloc_stats_log()
   logline_range_scaled("<  1000 sec", stats.s_sizebucket, 100, 999, age_scaler);
   logline_range_scaled(">= 1000 sec", stats.s_sizebucket, 999, 1000, age_scaler);
 
-  dmalloc_is_logging = 0;  
+  dmalloc_log_unprotect();
 
 }
 
-#ifdef DMALLOC_UNIT_TEST
 
-void  dmalloc_ut_logging()
+/* ------------------------------------------------------------------------- */
+#ifdef DMALLOC_UNIT_TEST
+/* ------------------------------------------------------------------------- */
+#include <string.h>
+
+static int unit_total;
+static int unit_passed;
+static int unit_failed;
+
+void ut_delim()
 {
+  printf("unit total tests %d passed %d failed %d\n", unit_total, unit_passed, \
+	 unit_failed);
+
+  unit_total = 0;
+  unit_failed = 0;
+  unit_passed = 0;
+}
+
+#define ut_mark ut_start
+void ut_start( char *descr)
+{
+  puts("---------------------------------------------------------------------");
+  printf("DMALLOC UNIT TESTS - %s:\n\n", descr);
+}
+
+void ut_check(char *descr, uint32_t expected, uint32_t actual)
+{
+  int passed = (expected == actual);
+
+  unit_total++;
+  if (passed) unit_passed++;
+  else unit_failed++;
+
+  printf("%-30s %-8s expected %10u actual %10u\n", descr, \
+	 passed ? "PASSED_" : "_FAILED", expected, actual);
+}
+
+void ut_clear(void)
+{
+  memset(&stats, 0, (sizeof(struct dmalloc_alloc_stats)));
+}
+
+#define UNUSED(x) (void)(x)
+void dmalloc_stats_getter(struct dmalloc_alloc_stats *p)
+{
+  UNUSED(p);
+}
+
+int main()
+{
+  ut_start("exercise logging");
+  dmalloc_log_stats();
 }
 #endif	/* DMALLOC_UNIT_TEST */

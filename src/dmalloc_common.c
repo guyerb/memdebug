@@ -3,7 +3,17 @@
 #include <stdint.h>
 #include "dmalloc_common.h"
 
-extern int dmalloc_is_logging;
+int is_logging = 0;
+
+void dmalloc_log_protect()
+{
+  is_logging = 1;
+}
+
+void dmalloc_log_unprotect()
+{
+  is_logging = 0;
+}
 
 void dmalloc_logf( const char* format, ... )
 {
@@ -19,7 +29,7 @@ void dmalloc_logf( const char* format, ... )
 }
 void dmalloc_printf( const char* format, ... )
 {
-  if (!dmalloc_is_logging) {
+  if (!is_logging) {
     va_list args;
 
     va_start(args, format);

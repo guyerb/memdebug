@@ -183,7 +183,7 @@ static int unit_total;
 static int unit_passed;
 static int unit_failed;
 
-void dmalloc_ut_delim()
+void ut_delim()
 {
   printf("unit total tests %d passed %d failed %d\n", unit_total, unit_passed, \
 	 unit_failed);
@@ -193,14 +193,14 @@ void dmalloc_ut_delim()
   unit_passed = 0;
 }
 
-#define dmalloc_ut_mark dmalloc_ut_start
-void dmalloc_ut_start( char *descr)
+#define ut_mark ut_start
+void ut_start( char *descr)
 {
   puts("---------------------------------------------------------------------");
   printf("DMALLOC UNIT TESTS - %s:\n\n", descr);
 }
 
-void dmalloc_ut_check(char *descr, uint32_t expected, uint32_t actual)
+void ut_check(char *descr, uint32_t expected, uint32_t actual)
 {
   int passed = (expected == actual);
 
@@ -212,7 +212,7 @@ void dmalloc_ut_check(char *descr, uint32_t expected, uint32_t actual)
 	 passed ? "PASSED_" : "_FAILED", expected, actual);
 }
 
-void dmalloc_ut_clear(void)
+void ut_clear(void)
 {
   memset(&dmalloc_stats, 0, (sizeof(struct dmalloc_alloc_stats)));
 }
@@ -246,31 +246,30 @@ int main()
     8192	t_2000
 */
 
-  printf("dmalloc stat unit tests:\n\n");
-  dmalloc_ut_start("exercise size_bucket_ndx()");
-  dmalloc_ut_check("0 byte bucket is ", 0, size_bucket_ndx(0));
-  dmalloc_ut_check("1 byte bucket is ", 0, size_bucket_ndx(1));
-  dmalloc_ut_check("2 byte bucket is ", 0, size_bucket_ndx(2));
-  dmalloc_ut_check("3 byte bucket is ", 0, size_bucket_ndx(3));
-  dmalloc_ut_check("4 byte bucket is ", 1, size_bucket_ndx(4));
-  dmalloc_ut_check("5 byte bucket is ", 1, size_bucket_ndx(5));
-  dmalloc_ut_check("6 byte bucket is ", 1, size_bucket_ndx(6));
-  dmalloc_ut_check("7 byte bucket is ", 1, size_bucket_ndx(7));
-  dmalloc_ut_check("8 byte bucket is ", 2, size_bucket_ndx(8));
-  dmalloc_ut_check("15 byte bucket is ", 2, size_bucket_ndx(15));
-  dmalloc_ut_check("2047 byte bucket is ", 9, size_bucket_ndx(2047));
-  dmalloc_ut_check("2049 byte bucket is ", 10, size_bucket_ndx(2049));
-  dmalloc_ut_check("4095 byte bucket is ", 10, size_bucket_ndx(4095));
-  dmalloc_ut_check("4096 byte bucket is ", 11, size_bucket_ndx(4096));
-  dmalloc_ut_check("4097 byte bucket is ", 11, size_bucket_ndx(4097));
-  dmalloc_ut_check("1234567 byte bucket is ", 11, size_bucket_ndx(1234567));
-  dmalloc_ut_delim();
+  ut_start("exercise size_bucket_ndx()");
+  ut_check("0 byte bucket is ", 0, size_bucket_ndx(0));
+  ut_check("1 byte bucket is ", 0, size_bucket_ndx(1));
+  ut_check("2 byte bucket is ", 0, size_bucket_ndx(2));
+  ut_check("3 byte bucket is ", 0, size_bucket_ndx(3));
+  ut_check("4 byte bucket is ", 1, size_bucket_ndx(4));
+  ut_check("5 byte bucket is ", 1, size_bucket_ndx(5));
+  ut_check("6 byte bucket is ", 1, size_bucket_ndx(6));
+  ut_check("7 byte bucket is ", 1, size_bucket_ndx(7));
+  ut_check("8 byte bucket is ", 2, size_bucket_ndx(8));
+  ut_check("15 byte bucket is ", 2, size_bucket_ndx(15));
+  ut_check("2047 byte bucket is ", 9, size_bucket_ndx(2047));
+  ut_check("2049 byte bucket is ", 10, size_bucket_ndx(2049));
+  ut_check("4095 byte bucket is ", 10, size_bucket_ndx(4095));
+  ut_check("4096 byte bucket is ", 11, size_bucket_ndx(4096));
+  ut_check("4097 byte bucket is ", 11, size_bucket_ndx(4097));
+  ut_check("1234567 byte bucket is ", 11, size_bucket_ndx(1234567));
+  ut_delim();
   /* ------------------------------------------------------------------------ */
-  dmalloc_ut_start("exercise failed malloc and basic lock");
-  dmalloc_ut_delim();
+  ut_start("exercise failed malloc and basic lock");
+  ut_delim();
   /* ------------------------------------------------------------------------ */
-  dmalloc_ut_start("exercise age and size buckets");
-  dmalloc_ut_clear();
+  ut_start("exercise age and size buckets");
+  ut_clear();
   dmalloc_stats_alloc(0, t_0);
   dmalloc_stats_alloc(1, t_0);
   dmalloc_stats_alloc(2, t_0);
@@ -288,57 +287,57 @@ int main()
   dmalloc_stats_alloc(8192, t_0);
   int bytes = 0 + 1 + 2 + 4 + 8 + 16 + 32 + 64 + 128 + 256 + 512 + 1024	\
     + 2048 +4096 + 8192;
-  dmalloc_ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
-  dmalloc_ut_check("alltime allocation", bytes, dmalloc_stats.s_total_countalloc);
-  dmalloc_ut_check("age  bucket 0", 15, dmalloc_stats.s_agebucket[BUCKET_0000]);
-  dmalloc_ut_check("size bucket 0", 3, dmalloc_stats.s_sizebucket[BUCKET_0000]);
-  dmalloc_ut_check("size bucket 1", 1, dmalloc_stats.s_sizebucket[BUCKET_0004]);
-  dmalloc_ut_check("size bucket 2", 1, dmalloc_stats.s_sizebucket[BUCKET_0008]);
-  dmalloc_ut_check("size bucket 3", 1, dmalloc_stats.s_sizebucket[BUCKET_0016]);
-  dmalloc_ut_check("size bucket 4", 1, dmalloc_stats.s_sizebucket[BUCKET_0032]);
-  dmalloc_ut_check("size bucket 5", 1, dmalloc_stats.s_sizebucket[BUCKET_0064]);
-  dmalloc_ut_check("size bucket 6", 1, dmalloc_stats.s_sizebucket[BUCKET_0128]);
-  dmalloc_ut_check("size bucket 7", 1, dmalloc_stats.s_sizebucket[BUCKET_0256]);
-  dmalloc_ut_check("size bucket 8", 1, dmalloc_stats.s_sizebucket[BUCKET_0512]);
-  dmalloc_ut_check("size bucket 9", 1, dmalloc_stats.s_sizebucket[BUCKET_1024]);
-  dmalloc_ut_check("size bucket 10", 1, dmalloc_stats.s_sizebucket[BUCKET_2048]);
-  dmalloc_ut_check("size bucket 11", 2, dmalloc_stats.s_sizebucket[BUCKET_4096]);
-  dmalloc_ut_check("declined update", 14, dmalloc_stats._s_declined_update);
+  ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
+  ut_check("alltime allocation", bytes, dmalloc_stats.s_total_countalloc);
+  ut_check("age  bucket 0", 15, dmalloc_stats.s_agebucket[BUCKET_0000]);
+  ut_check("size bucket 0", 3, dmalloc_stats.s_sizebucket[BUCKET_0000]);
+  ut_check("size bucket 1", 1, dmalloc_stats.s_sizebucket[BUCKET_0004]);
+  ut_check("size bucket 2", 1, dmalloc_stats.s_sizebucket[BUCKET_0008]);
+  ut_check("size bucket 3", 1, dmalloc_stats.s_sizebucket[BUCKET_0016]);
+  ut_check("size bucket 4", 1, dmalloc_stats.s_sizebucket[BUCKET_0032]);
+  ut_check("size bucket 5", 1, dmalloc_stats.s_sizebucket[BUCKET_0064]);
+  ut_check("size bucket 6", 1, dmalloc_stats.s_sizebucket[BUCKET_0128]);
+  ut_check("size bucket 7", 1, dmalloc_stats.s_sizebucket[BUCKET_0256]);
+  ut_check("size bucket 8", 1, dmalloc_stats.s_sizebucket[BUCKET_0512]);
+  ut_check("size bucket 9", 1, dmalloc_stats.s_sizebucket[BUCKET_1024]);
+  ut_check("size bucket 10", 1, dmalloc_stats.s_sizebucket[BUCKET_2048]);
+  ut_check("size bucket 11", 2, dmalloc_stats.s_sizebucket[BUCKET_4096]);
+  ut_check("declined update", 14, dmalloc_stats._s_declined_update);
   dmalloc_stats_alloc(8192, t_1);
   bytes += 8192;
-  dmalloc_ut_check("size bucket 11", 3, dmalloc_stats.s_sizebucket[BUCKET_4096]);
-  dmalloc_ut_check("declined update", 14, dmalloc_stats._s_declined_update);
-  dmalloc_ut_check("age  bucket 0", 1, dmalloc_stats.s_agebucket[0]);
-  dmalloc_ut_check("age  bucket 1", 15, dmalloc_stats.s_agebucket[1]);
-  dmalloc_ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
-  dmalloc_ut_check("alltime allocation", bytes, dmalloc_stats.s_total_countalloc);
+  ut_check("size bucket 11", 3, dmalloc_stats.s_sizebucket[BUCKET_4096]);
+  ut_check("declined update", 14, dmalloc_stats._s_declined_update);
+  ut_check("age  bucket 0", 1, dmalloc_stats.s_agebucket[0]);
+  ut_check("age  bucket 1", 15, dmalloc_stats.s_agebucket[1]);
+  ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
+  ut_check("alltime allocation", bytes, dmalloc_stats.s_total_countalloc);
   dmalloc_stats_alloc(8192, t_999);
   bytes += 8192;
-  dmalloc_ut_check("size bucket 11", 4, dmalloc_stats.s_sizebucket[BUCKET_4096]);
-  dmalloc_ut_check("age  bucket 0", 1, dmalloc_stats.s_agebucket[0]);
-  dmalloc_ut_check("age  bucket 998", 1, dmalloc_stats.s_agebucket[998]);
-  dmalloc_ut_check("age  bucket 999", 15, dmalloc_stats.s_agebucket[999]);
+  ut_check("size bucket 11", 4, dmalloc_stats.s_sizebucket[BUCKET_4096]);
+  ut_check("age  bucket 0", 1, dmalloc_stats.s_agebucket[0]);
+  ut_check("age  bucket 998", 1, dmalloc_stats.s_agebucket[998]);
+  ut_check("age  bucket 999", 15, dmalloc_stats.s_agebucket[999]);
   dmalloc_stats_alloc(8192, t_1500);
   bytes += 8192;
-  dmalloc_ut_check("size bucket 11", 5, dmalloc_stats.s_sizebucket[BUCKET_4096]);
-  dmalloc_ut_check("age  bucket 0", 1, dmalloc_stats.s_agebucket[0]);
-  dmalloc_ut_check("age  bucket 999", 16, dmalloc_stats.s_agebucket[999]);
+  ut_check("size bucket 11", 5, dmalloc_stats.s_sizebucket[BUCKET_4096]);
+  ut_check("age  bucket 0", 1, dmalloc_stats.s_agebucket[0]);
+  ut_check("age  bucket 999", 16, dmalloc_stats.s_agebucket[999]);
   dmalloc_stats_alloc(8192, t_2000);
   bytes += 8192;
-  dmalloc_ut_check("size bucket 11", 6, dmalloc_stats.s_sizebucket[BUCKET_4096]);
-  dmalloc_ut_check("age  bucket 0", 1, dmalloc_stats.s_agebucket[0]);
-  dmalloc_ut_check("age  bucket 999", 17, dmalloc_stats.s_agebucket[999]);
-  dmalloc_ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
-  dmalloc_ut_check("alltime allocation", bytes, dmalloc_stats.s_total_countalloc);
+  ut_check("size bucket 11", 6, dmalloc_stats.s_sizebucket[BUCKET_4096]);
+  ut_check("age  bucket 0", 1, dmalloc_stats.s_agebucket[0]);
+  ut_check("age  bucket 999", 17, dmalloc_stats.s_agebucket[999]);
+  ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
+  ut_check("alltime allocation", bytes, dmalloc_stats.s_total_countalloc);
 
-  dmalloc_ut_mark("now check free:");
-  dmalloc_ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
-  dmalloc_ut_check("alltime allocation", bytes, dmalloc_stats.s_total_countalloc);
+  ut_mark("now check free:");
+  ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
+  ut_check("alltime allocation", bytes, dmalloc_stats.s_total_countalloc);
 
   dmalloc_stats_free(bytes * 2, t_2000, t_0);
-  dmalloc_ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
-  dmalloc_ut_check("alltime allocation", bytes, dmalloc_stats.s_total_countalloc);
-  dmalloc_ut_check("size underrun", 1, dmalloc_stats._s_underrun_sizebucket);
+  ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
+  ut_check("alltime allocation", bytes, dmalloc_stats.s_total_countalloc);
+  ut_check("size underrun", 1, dmalloc_stats._s_underrun_sizebucket);
   int tbytes = bytes;
   dmalloc_stats_free(8192, t_2000, t_2000);
   dmalloc_stats_free(8192, t_2000, t_1500);
@@ -348,13 +347,13 @@ int main()
   bytes -= 8192 * 5;
   dmalloc_stats_free(4096, t_2000, t_0);
   bytes -= 4096;
-  dmalloc_ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
-  dmalloc_ut_check("alltime allocation", tbytes, dmalloc_stats.s_total_countalloc);
-  dmalloc_ut_check("age  bucket 999", 13, dmalloc_stats.s_agebucket[999]);
-  dmalloc_ut_check("age  bucket 0", 0, dmalloc_stats.s_agebucket[0]);
+  ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
+  ut_check("alltime allocation", tbytes, dmalloc_stats.s_total_countalloc);
+  ut_check("age  bucket 999", 13, dmalloc_stats.s_agebucket[999]);
+  ut_check("age  bucket 0", 0, dmalloc_stats.s_agebucket[0]);
   dmalloc_stats_free(4096, t_2000, t_0);
-  dmalloc_ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
-  dmalloc_ut_check("age  bucket 0", 0, dmalloc_stats.s_agebucket[0]);
+  ut_check("current allocation", bytes, dmalloc_stats.s_curr_countalloc);
+  ut_check("age  bucket 0", 0, dmalloc_stats.s_agebucket[0]);
   dmalloc_stats_free(2048, t_2000, t_0);
   dmalloc_stats_free(1024, t_2000, t_0);
   dmalloc_stats_free(512, t_2000, t_0);
@@ -368,10 +367,10 @@ int main()
   dmalloc_stats_free(2, t_2000, t_0);
   dmalloc_stats_free(1, t_2000, t_0);
   dmalloc_stats_free(0, t_2000, t_0);
-  dmalloc_ut_check("current allocation", 0, dmalloc_stats.s_curr_countalloc);
-  dmalloc_ut_check("alltime allocation", tbytes, dmalloc_stats.s_total_countalloc);
-  dmalloc_ut_check("age bucket 999", 0, dmalloc_stats.s_agebucket[999]);
-  dmalloc_ut_check("age bucket 0", 0, dmalloc_stats.s_agebucket[0]);
+  ut_check("current allocation", 0, dmalloc_stats.s_curr_countalloc);
+  ut_check("alltime allocation", tbytes, dmalloc_stats.s_total_countalloc);
+  ut_check("age bucket 999", 0, dmalloc_stats.s_agebucket[999]);
+  ut_check("age bucket 0", 0, dmalloc_stats.s_agebucket[0]);
 
   int population = 0;
   for (int i=0; i< BUCKETS_AGE_NUM; i++) {
@@ -379,7 +378,7 @@ int main()
 				       dmalloc_stats.s_agebucket[i], i);
     population += dmalloc_stats.s_agebucket[i];
   }
-  dmalloc_ut_check("age bucket population", 0, population);
+  ut_check("age bucket population", 0, population);
 
   population = 0;
   for (int i=0; i< BUCKETS_SIZE_NUM; i++) {
@@ -387,10 +386,8 @@ int main()
 				      dmalloc_stats.s_sizebucket[i], i);
     population += dmalloc_stats.s_sizebucket[i];
   }
-  dmalloc_ut_check("size bucket population", 0, population);
-  dmalloc_ut_delim();
-
-  dmalloc_ut_logging();
+  ut_check("size bucket population", 0, population);
+  ut_delim();
 
   /*------------------------------------------------------------------------- */
 }

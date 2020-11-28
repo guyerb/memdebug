@@ -1,0 +1,27 @@
+# -*- MakeFile -*-
+# 
+# unit test for stat and logging subsystem
+#
+
+objects := dmalloc_log.o dmalloc_common.o
+depends := $(objects:.o=.d)
+
+uname := $(shell uname -s)
+ifeq ($(uname), Linux)
+	os = LINUX
+endif
+ifeq ($(uname), Darwin)
+	os = DARWIN
+endif
+
+%.o: %.c
+	gcc -g -std=c99 -Wall -Wextra -D DMALLOC_UNIT_TEST -D $(os) -c  $<  -o $@
+	@gcc -MM $*.c > $*.d
+
+ut-logs: $(objects)
+	gcc -g  $^  -o $@	
+
+clean:
+	rm -f *.o *.d *~ ut
+
+-include $(depends)
