@@ -21,25 +21,28 @@ int dmalloc_is_logging = 1;
 */
 
 /* find range (powers of 10) of age buckets with largest value
-   N.B - assume that len is a power of 10 (i.e. 10, 100, 1000...)
+   N.B -  brute forcing this.
  */
-static int logline_power10_largest(uint32_t *p, size_t len)
+static int logline_power10_largest(uint32_t *p)
 {
-  uint32_t power = 0;
-  uint32_t ceiling = 1;
-  uint32_t floor = ceiling;
   uint32_t largest = 0;
+  uint32_t count = 0;
 
- for (power = 1; power <= len; power *= 10) {;}
+  count = 0;
+  for (int i = 0; i < 10; i++) { count+= p[i]; }
+  if (count > largest) largest = count;
 
-  for (uint32_t i = 0; i < power; i++) {
-    uint32_t count = 0;
-    ceiling = ceiling * 10;
-    for (floor = ceiling; floor < ceiling; floor++) {
-      count += p[floor];
-    }
-    if (count > largest) largest = count;
-  }
+  count = 0;
+  for (int i = 10; i < 99; i++) { count+= p[i]; }
+  if (count > largest) largest = count;
+
+  count = 0;
+  for (int i = 100; i < 999; i++) { count+= p[i]; }
+  if (count > largest) largest = count;
+
+  count = p[999];
+  if (count > largest) largest = count;
+
   return largest;
 }
 
@@ -91,8 +94,8 @@ static void logline_range_scaled(char *hdr, uint32_t *p, uint32_t floor, uint32_
 {
   uint32_t count = 0;
 
-  for (int i = floor; floor < ceiling; i++) {
-    count += p[i];
+  for (floor = floor; floor < ceiling; floor++) {
+    count += p[floor];
   }
   logline_scaled(hdr, count, scale);
 }
@@ -172,7 +175,7 @@ void dmalloc_stats_log()
   logline_scaled("4096 - infi",	stats.s_sizebuckets[BUCKET_4096], sz_scaler);
 
   /* dump size buckets */
-  uint32_t age_largest = logline_power10_largest( (uint32_t *)&stats.s_agebuckets, BUCKETS_AGE_NUM);
+  uint32_t age_largest = logline_power10_largest( (uint32_t *)&stats.s_agebuckets);
   uint32_t age_scaler = logline_scaler(age_largest, 65);
 
   dmalloc_logf("Current age allocations by bytes: ( one # represents %d bytes)\n", age_scaler);
