@@ -1,4 +1,6 @@
 ChangeLog for dmalloc
+2020-11-27 - v0.4
+	*statistic working and debugged (cd src && make -f Makefile.unit && ./unit)
 2020-11-24 - v0.3
 	* compiles and runs (and crashes) on Linux and OS X
 	* tracking functionality in place.

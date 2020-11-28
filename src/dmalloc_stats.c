@@ -5,32 +5,24 @@
 #include <time.h>
 #include <sys/queue.h>
 
-enum bucket_index {
-  BUCKET_0000, BUCKET_0004, BUCKET_0008, BUCKET_0016, BUCKET_0032, BUCKET_0064,
-  BUCKET_0128, BUCKET_0256, BUCKET_0512, BUCKET_1024, BUCKET_2048, BUCKET_4096,
-};
-#define BUCKETS_SIZE_NUM 12	/* N.B. adjust if you increase enums above*/
-#define BUCKETS_AGE_NUM  1000
+#include "dmalloc_stats.h"
+#include "dmalloc_common.h"
 
-/* can easily be extended to uint64_t, logging output would need work */
-struct dmalloc_stats {
-  uint32_t s_allocated_current;
-  uint32_t s_allocated_alltime;
-  uint32_t s_sizebuckets[BUCKETS_SIZE_NUM]; /* allocations by size */
-  uint32_t s_agebuckets[BUCKETS_AGE_NUM];  /* allocations by age (seconds) */
-  uint32_t s_null_frees;
-  uint32_t s_failed_allocs;
-  uint32_t s_invalid_birthdays;
-  time_t   s_agebuckets_lastupdate;
 
-  /* internal debugging */
-  uint32_t _s_agebucket_underrun_error;
-  uint32_t _s_sizebucket_underrun_error;
-  uint32_t _s_lockerror;
-  uint32_t _s_declined_updates;
-};
+struct dmalloc_alloc_stats dmalloc_stats = {0};
 
-static struct dmalloc_stats stats = {0};
+static pthread_mutex_t dmalloc_stats_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void dmalloc_stats_getter(struct dmalloc_alloc_stats *pcopy)
+{
+  if (pthread_mutex_lock(&dmalloc_stats_mutex) == 0) {
+    if (pcopy)
+      *pcopy = dmalloc_stats;
+    pthread_mutex_unlock(&dmalloc_stats_mutex);
+  } else {
+    dmalloc_stats._s_lockerror++;
+  }
+}
 
 /*
  * we monitor the age of each allocation by grouping them in buckets,
@@ -40,38 +32,37 @@ static struct dmalloc_stats stats = {0};
  */
 static void dmalloc_agebuckets_update(time_t now)
 {
-  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
   time_t elapsed;
 
-  if (pthread_mutex_lock(&mutex) == 0) {
-    elapsed = now - stats.s_agebuckets_lastupdate;
-    stats.s_agebuckets_lastupdate = now;
-    pthread_mutex_unlock(&mutex);
+  if (pthread_mutex_lock(&dmalloc_stats_mutex) == 0) {
+    elapsed = now - dmalloc_stats.s_agebuckets_lastupdate;
+    dmalloc_stats.s_agebuckets_lastupdate = now;
+    pthread_mutex_unlock(&dmalloc_stats_mutex);
 
     if (elapsed > 0) {
       for (int i = BUCKETS_AGE_NUM; i > 0; i--) {
 	int src_ndx = i - 1;
 	int dst_ndx = src_ndx + elapsed;
-	time_t src_val = stats.s_agebuckets[src_ndx];
+	time_t src_val = dmalloc_stats.s_agebuckets[src_ndx];
 
 	if (src_ndx == 999) continue;	/* bucket 1000 doesn't age */
-	stats.s_agebuckets[src_ndx] = 0;
+	dmalloc_stats.s_agebuckets[src_ndx] = 0;
 	if (dst_ndx >= 999)
-	  stats.s_agebuckets[999] += src_val;
+	  dmalloc_stats.s_agebuckets[999] += src_val;
 	else
-	  stats.s_agebuckets[dst_ndx] = src_val; /* not +- as residents moved */
+	  dmalloc_stats.s_agebuckets[dst_ndx] = src_val;
       }
     } else {
-	stats._s_declined_updates++;
+	dmalloc_stats._s_declined_updates++;
     }
   } else {
-    stats._s_lockerror++;
+    dmalloc_stats._s_lockerror++;
   }
 }
 
 static void dmalloc_agebucket_insert()
 {
-  stats.s_agebuckets[0]++;
+  dmalloc_stats.s_agebuckets[0]++;
 }
 
 
@@ -80,7 +71,7 @@ static int dmalloc_agebucket_ndx(time_t now, time_t birth)
   int ndx = -1;
 
   if (birth > now) {
-    stats.s_invalid_birthdays++;
+    dmalloc_stats.s_invalid_birthdays++;
     ndx = -1;
   } else {
     ndx = now - birth;
@@ -96,20 +87,19 @@ static int dmalloc_agebucket_ndx(time_t now, time_t birth)
    the population by one at the next populated bucket */
 static void dmalloc_agebucket_delete(time_t now, time_t birth)
 {
-  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
   int ndx = 0;
 
   ndx = dmalloc_agebucket_ndx(now, birth);
   if (ndx >= 0) {
     dmalloc_agebuckets_update(now);
 
-    pthread_mutex_lock(&mutex);
-    if (stats.s_agebuckets[ndx] != 0) {
-      stats.s_agebuckets[ndx]--;
+    pthread_mutex_lock(&dmalloc_stats_mutex);
+    if (dmalloc_stats.s_agebuckets[ndx] != 0) {
+      dmalloc_stats.s_agebuckets[ndx]--;
     } else {
-      stats._s_agebucket_underrun_error++;
+      dmalloc_stats._s_agebucket_underrun_error++;
     }
-    pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&dmalloc_stats_mutex);
   }
 }
 
@@ -142,17 +132,15 @@ static int size_bucket_ndx(size_t sz)
 
 void dmalloc_stats_alloc(size_t sz, time_t now)
 {
-  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-
-  if (pthread_mutex_lock(&mutex) == 0) {
+  if (pthread_mutex_lock(&dmalloc_stats_mutex) == 0) {
       int ndx = size_bucket_ndx(sz);
 
-      stats.s_allocated_alltime += sz;
-      stats.s_allocated_current += sz;
-      stats.s_sizebuckets[ndx]++;
-      pthread_mutex_unlock(&mutex);
+      dmalloc_stats.s_allocated_alltime += sz;
+      dmalloc_stats.s_allocated_current += sz;
+      dmalloc_stats.s_sizebuckets[ndx]++;
+      pthread_mutex_unlock(&dmalloc_stats_mutex);
   } else {
-    stats._s_lockerror++;
+    dmalloc_stats._s_lockerror++;
  }
 
   dmalloc_agebuckets_update(now);
@@ -163,25 +151,25 @@ void dmalloc_stats_alloc(size_t sz, time_t now)
 
 void dmalloc_stats_free(size_t sz, time_t now, time_t birth)
 {
-  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
   int ndx = size_bucket_ndx(sz);
   int error = 0;
 
-  if (pthread_mutex_lock(&mutex) == 0) {
+  if (pthread_mutex_lock(&dmalloc_stats_mutex) == 0) {
 
-    if ((stats.s_allocated_current >= sz) && (stats.s_sizebuckets[ndx])) {
-      stats.s_allocated_current -= sz;
-      stats.s_sizebuckets[ndx]--;
+    if ((dmalloc_stats.s_allocated_current >= sz) && \
+	(dmalloc_stats.s_sizebuckets[ndx])) {
+      dmalloc_stats.s_allocated_current -= sz;
+      dmalloc_stats.s_sizebuckets[ndx]--;
     } else {
-      stats._s_sizebucket_underrun_error++;
+      dmalloc_stats._s_sizebucket_underrun_error++;
       error = 1;
     }
-    pthread_mutex_unlock(&mutex);
+    pthread_mutex_unlock(&dmalloc_stats_mutex);
 
     if (!error) dmalloc_agebucket_delete(now, birth);
 
   } else {
-    stats._s_lockerror++;
+    dmalloc_stats._s_lockerror++;
   }
   return;
 }
@@ -206,7 +194,7 @@ void dmalloc_stats_delim()
 void dmalloc_stats_start( char *descr)
 {
   puts("---------------------------------------------------------------------");
-  printf("%s:\n", descr);
+  printf("DMALLOC UNIT TESTS  %s:\n\n", descr);
 }
 
 void dmalloc_stats_check(char *descr, uint32_t expected, uint32_t actual)
@@ -223,7 +211,7 @@ void dmalloc_stats_check(char *descr, uint32_t expected, uint32_t actual)
 
 void dmalloc_stats_clear(void)
 {
-  memset(&stats, 0, (sizeof(struct dmalloc_stats)));
+  memset(&dmalloc_stats, 0, (sizeof(struct dmalloc_alloc_stats)));
 }
 
 #ifdef DMALLOC_STATS_UNIT
@@ -298,58 +286,58 @@ int main()
   dmalloc_stats_alloc(8192, t_0);
   int bytes = 0 + 1 + 2 + 4 + 8 + 16 + 32 + 64 + 128 + 256 + 512 + 1024	\
     + 2048 +4096 + 8192;
-  dmalloc_stats_check("current allocation", bytes, stats.s_allocated_current);
-  dmalloc_stats_check("alltime allocation", bytes, stats.s_allocated_alltime);
-  dmalloc_stats_check("age  bucket 0", 15, stats.s_agebuckets[BUCKET_0000]);
+  dmalloc_stats_check("current allocation", bytes, dmalloc_stats.s_allocated_current);
+  dmalloc_stats_check("alltime allocation", bytes, dmalloc_stats.s_allocated_alltime);
+  dmalloc_stats_check("age  bucket 0", 15, dmalloc_stats.s_agebuckets[BUCKET_0000]);
 
-  dmalloc_stats_check("size bucket 0", 3, stats.s_sizebuckets[BUCKET_0000]);
-  dmalloc_stats_check("size bucket 1", 1, stats.s_sizebuckets[BUCKET_0004]);
-  dmalloc_stats_check("size bucket 2", 1, stats.s_sizebuckets[BUCKET_0008]);
-  dmalloc_stats_check("size bucket 3", 1, stats.s_sizebuckets[BUCKET_0016]);
-  dmalloc_stats_check("size bucket 4", 1, stats.s_sizebuckets[BUCKET_0032]);
-  dmalloc_stats_check("size bucket 5", 1, stats.s_sizebuckets[BUCKET_0064]);
-  dmalloc_stats_check("size bucket 6", 1, stats.s_sizebuckets[BUCKET_0128]);
-  dmalloc_stats_check("size bucket 7", 1, stats.s_sizebuckets[BUCKET_0256]);
-  dmalloc_stats_check("size bucket 8", 1, stats.s_sizebuckets[BUCKET_0512]);
-  dmalloc_stats_check("size bucket 9", 1, stats.s_sizebuckets[BUCKET_1024]);
-  dmalloc_stats_check("size bucket 10", 1, stats.s_sizebuckets[BUCKET_2048]);
-  dmalloc_stats_check("size bucket 11", 2, stats.s_sizebuckets[BUCKET_4096]);
-  dmalloc_stats_check("declined update", 14, stats._s_declined_updates);
+  dmalloc_stats_check("size bucket 0", 3, dmalloc_stats.s_sizebuckets[BUCKET_0000]);
+  dmalloc_stats_check("size bucket 1", 1, dmalloc_stats.s_sizebuckets[BUCKET_0004]);
+  dmalloc_stats_check("size bucket 2", 1, dmalloc_stats.s_sizebuckets[BUCKET_0008]);
+  dmalloc_stats_check("size bucket 3", 1, dmalloc_stats.s_sizebuckets[BUCKET_0016]);
+  dmalloc_stats_check("size bucket 4", 1, dmalloc_stats.s_sizebuckets[BUCKET_0032]);
+  dmalloc_stats_check("size bucket 5", 1, dmalloc_stats.s_sizebuckets[BUCKET_0064]);
+  dmalloc_stats_check("size bucket 6", 1, dmalloc_stats.s_sizebuckets[BUCKET_0128]);
+  dmalloc_stats_check("size bucket 7", 1, dmalloc_stats.s_sizebuckets[BUCKET_0256]);
+  dmalloc_stats_check("size bucket 8", 1, dmalloc_stats.s_sizebuckets[BUCKET_0512]);
+  dmalloc_stats_check("size bucket 9", 1, dmalloc_stats.s_sizebuckets[BUCKET_1024]);
+  dmalloc_stats_check("size bucket 10", 1, dmalloc_stats.s_sizebuckets[BUCKET_2048]);
+  dmalloc_stats_check("size bucket 11", 2, dmalloc_stats.s_sizebuckets[BUCKET_4096]);
+  dmalloc_stats_check("declined update", 14, dmalloc_stats._s_declined_updates);
   dmalloc_stats_alloc(8192, t_1);
   bytes += 8192;
-  dmalloc_stats_check("size bucket 11", 3, stats.s_sizebuckets[BUCKET_4096]);
-  dmalloc_stats_check("declined update", 14, stats._s_declined_updates);
-  dmalloc_stats_check("age  bucket 0", 1, stats.s_agebuckets[0]);
-  dmalloc_stats_check("age  bucket 1", 15, stats.s_agebuckets[1]);
-  dmalloc_stats_check("current allocation", bytes, stats.s_allocated_current);
-  dmalloc_stats_check("alltime allocation", bytes, stats.s_allocated_alltime);
+  dmalloc_stats_check("size bucket 11", 3, dmalloc_stats.s_sizebuckets[BUCKET_4096]);
+  dmalloc_stats_check("declined update", 14, dmalloc_stats._s_declined_updates);
+  dmalloc_stats_check("age  bucket 0", 1, dmalloc_stats.s_agebuckets[0]);
+  dmalloc_stats_check("age  bucket 1", 15, dmalloc_stats.s_agebuckets[1]);
+  dmalloc_stats_check("current allocation", bytes, dmalloc_stats.s_allocated_current);
+  dmalloc_stats_check("alltime allocation", bytes, dmalloc_stats.s_allocated_alltime);
   dmalloc_stats_alloc(8192, t_999);
   bytes += 8192;
-  dmalloc_stats_check("size bucket 11", 4, stats.s_sizebuckets[BUCKET_4096]);
-  dmalloc_stats_check("age  bucket 0", 1, stats.s_agebuckets[0]);
-  dmalloc_stats_check("age  bucket 998", 1, stats.s_agebuckets[998]);
-  dmalloc_stats_check("age  bucket 999", 15, stats.s_agebuckets[999]);
+  dmalloc_stats_check("size bucket 11", 4, dmalloc_stats.s_sizebuckets[BUCKET_4096]);
+  dmalloc_stats_check("age  bucket 0", 1, dmalloc_stats.s_agebuckets[0]);
+  dmalloc_stats_check("age  bucket 998", 1, dmalloc_stats.s_agebuckets[998]);
+  dmalloc_stats_check("age  bucket 999", 15, dmalloc_stats.s_agebuckets[999]);
   dmalloc_stats_alloc(8192, t_1500);
   bytes += 8192;
-  dmalloc_stats_check("size bucket 11", 5, stats.s_sizebuckets[BUCKET_4096]);
-  dmalloc_stats_check("age  bucket 0", 1, stats.s_agebuckets[0]);
-  dmalloc_stats_check("age  bucket 999", 16, stats.s_agebuckets[999]);
+  dmalloc_stats_check("size bucket 11", 5, dmalloc_stats.s_sizebuckets[BUCKET_4096]);
+  dmalloc_stats_check("age  bucket 0", 1, dmalloc_stats.s_agebuckets[0]);
+  dmalloc_stats_check("age  bucket 999", 16, dmalloc_stats.s_agebuckets[999]);
   dmalloc_stats_alloc(8192, t_2000);
   bytes += 8192;
-  dmalloc_stats_check("size bucket 11", 6, stats.s_sizebuckets[BUCKET_4096]);
-  dmalloc_stats_check("age  bucket 0", 1, stats.s_agebuckets[0]);
-  dmalloc_stats_check("age  bucket 999", 17, stats.s_agebuckets[999]);
-  dmalloc_stats_check("current allocation", bytes, stats.s_allocated_current);
-  dmalloc_stats_check("alltime allocation", bytes, stats.s_allocated_alltime);
+  dmalloc_stats_check("size bucket 11", 6, dmalloc_stats.s_sizebuckets[BUCKET_4096]);
+  dmalloc_stats_check("age  bucket 0", 1, dmalloc_stats.s_agebuckets[0]);
+  dmalloc_stats_check("age  bucket 999", 17, dmalloc_stats.s_agebuckets[999]);
+  dmalloc_stats_check("current allocation", bytes, dmalloc_stats.s_allocated_current);
+  dmalloc_stats_check("alltime allocation", bytes, dmalloc_stats.s_allocated_alltime);
 
   dmalloc_stats_mark("now check free:");
-  dmalloc_stats_check("current allocation", bytes, stats.s_allocated_current);
-  dmalloc_stats_check("alltime allocation", bytes, stats.s_allocated_alltime);
+  dmalloc_stats_check("current allocation", bytes, dmalloc_stats.s_allocated_current);
+  dmalloc_stats_check("alltime allocation", bytes, dmalloc_stats.s_allocated_alltime);
 
   dmalloc_stats_free(bytes * 2, t_2000, t_0);
-  dmalloc_stats_check("current allocation", bytes, stats.s_allocated_current);
-  dmalloc_stats_check("alltime allocation", bytes, stats.s_allocated_alltime);
-  dmalloc_stats_check("size underrun", 1, stats._s_sizebucket_underrun_error);
+  dmalloc_stats_check("current allocation", bytes, dmalloc_stats.s_allocated_current);
+  dmalloc_stats_check("alltime allocation", bytes, dmalloc_stats.s_allocated_alltime);
+  dmalloc_stats_check("size underrun", 1, dmalloc_stats._s_sizebucket_underrun_error);
   int tbytes = bytes;
   dmalloc_stats_free(8192, t_2000, t_2000);
   dmalloc_stats_free(8192, t_2000, t_1500);
@@ -359,13 +347,13 @@ int main()
   bytes -= 8192 * 5;
   dmalloc_stats_free(4096, t_2000, t_0);
   bytes -= 4096;
-  dmalloc_stats_check("current allocation", bytes, stats.s_allocated_current);
-  dmalloc_stats_check("alltime allocation", tbytes, stats.s_allocated_alltime);
-  dmalloc_stats_check("age  bucket 999", 13, stats.s_agebuckets[999]);
-  dmalloc_stats_check("age  bucket 0", 0, stats.s_agebuckets[0]);
+  dmalloc_stats_check("current allocation", bytes, dmalloc_stats.s_allocated_current);
+  dmalloc_stats_check("alltime allocation", tbytes, dmalloc_stats.s_allocated_alltime);
+  dmalloc_stats_check("age  bucket 999", 13, dmalloc_stats.s_agebuckets[999]);
+  dmalloc_stats_check("age  bucket 0", 0, dmalloc_stats.s_agebuckets[0]);
   dmalloc_stats_free(4096, t_2000, t_0);
-  dmalloc_stats_check("current allocation", bytes, stats.s_allocated_current);
-  dmalloc_stats_check("age  bucket 0", 0, stats.s_agebuckets[0]);
+  dmalloc_stats_check("current allocation", bytes, dmalloc_stats.s_allocated_current);
+  dmalloc_stats_check("age  bucket 0", 0, dmalloc_stats.s_agebuckets[0]);
   dmalloc_stats_free(2048, t_2000, t_0);
   dmalloc_stats_free(1024, t_2000, t_0);
   dmalloc_stats_free(512, t_2000, t_0);
@@ -379,27 +367,30 @@ int main()
   dmalloc_stats_free(2, t_2000, t_0);
   dmalloc_stats_free(1, t_2000, t_0);
   dmalloc_stats_free(0, t_2000, t_0);
-  dmalloc_stats_check("current allocation", 0, stats.s_allocated_current);
-  dmalloc_stats_check("alltime allocation", tbytes, stats.s_allocated_alltime);
-  dmalloc_stats_check("age bucket 999", 0, stats.s_agebuckets[999]);
-  dmalloc_stats_check("age bucket 0", 0, stats.s_agebuckets[0]);
+  dmalloc_stats_check("current allocation", 0, dmalloc_stats.s_allocated_current);
+  dmalloc_stats_check("alltime allocation", tbytes, dmalloc_stats.s_allocated_alltime);
+  dmalloc_stats_check("age bucket 999", 0, dmalloc_stats.s_agebuckets[999]);
+  dmalloc_stats_check("age bucket 0", 0, dmalloc_stats.s_agebuckets[0]);
 
   int population = 0;
   for (int i=0; i< BUCKETS_AGE_NUM; i++) {
-    if (stats.s_agebuckets[i]) printf("age_bucket: %d residents at index %d\n",\
-				       stats.s_agebuckets[i], i);
-    population += stats.s_agebuckets[i];
+    if (dmalloc_stats.s_agebuckets[i]) printf("age_bucket: %d residents at index %d\n",\
+				       dmalloc_stats.s_agebuckets[i], i);
+    population += dmalloc_stats.s_agebuckets[i];
   }
   dmalloc_stats_check("age bucket population", 0, population);
 
   population = 0;
   for (int i=0; i< BUCKETS_SIZE_NUM; i++) {
-    if (stats.s_sizebuckets[i]) printf("sz_bucket: %d residents at index %d\n",\
-				      stats.s_sizebuckets[i], i);
-    population += stats.s_sizebuckets[i];
+    if (dmalloc_stats.s_sizebuckets[i]) printf("sz_bucket: %d residents at index %d\n",\
+				      dmalloc_stats.s_sizebuckets[i], i);
+    population += dmalloc_stats.s_sizebuckets[i];
   }
   dmalloc_stats_check("size bucket population", 0, population);
   dmalloc_stats_delim();
+
+  dmalloc_stats_start("exercise logger");
+  dmalloc_stats_log();
 
   /*------------------------------------------------------------------------- */
 }

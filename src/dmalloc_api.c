@@ -1,3 +1,4 @@
+/* TODO: This doesn't do anything yet. */
 #include <stdio.h>
 #include "dmalloc_common.h"
 #include "dmalloc_api.h"
@@ -21,11 +22,6 @@ void dmalloc_start()
 void dmalloc_reset()
 {
   dmalloc_printf("dmalloc_reset\n");
-}
-
-void dmalloc_log()
-{
-  dmalloc_printf("dmalloc_log\n");
 }
 
 void dmalloc_debug_set()

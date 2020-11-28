@@ -1,10 +1,10 @@
+/* TODO: this doesn't do anything as yet. */
 #ifndef DMALLOC_API_H
 #define DMALLOC_API_H
 
 extern void dmalloc_stop();
 extern void dmalloc_start();
 extern void dmalloc_reset();
-extern void dmalloc_log();
 extern void dmalloc_debug_set();
 extern void dmalloc_debug_get();
 
