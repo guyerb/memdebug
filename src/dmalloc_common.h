@@ -21,12 +21,19 @@
 #define dmalloc_usable_size malloc_size
 #endif
 
-extern void dmalloc_stats_alloc(size_t sz, time_t now);
-extern void dmalloc_stats_free(size_t sz, time_t now, time_t birth);
+extern void dmalloc_stats_alloc(size_t, time_t);
+extern void dmalloc_stats_free(size_t, time_t, time_t);
 extern void dmalloc_printf( const char* format, ... );
 extern void dmalloc_logf( const char* format, ... );
 
 extern void dmalloc_stats_log();
+
+#ifdef DMALLOC_UNIT_TEST
+extern void dmalloc_ut_logging();
+extern void dmalloc_ut_delim();
+extern void dmalloc_ut_start(char *);
+extern void dmalloc_ut_check(char *, uint32_t, uint32_t);
+#endif
 
 static inline size_t dmalloc_extrabytes_sz()
 {

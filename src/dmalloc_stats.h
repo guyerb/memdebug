@@ -10,20 +10,22 @@ enum bucket_index {
 
 /* can easily be extended to uint64_t, logging and unit test output would need work */
 struct dmalloc_alloc_stats {
-  uint32_t s_allocated_current;
-  uint32_t s_allocated_alltime;
-  uint32_t s_sizebuckets[BUCKETS_SIZE_NUM]; /* allocations by size */
-  uint32_t s_agebuckets[BUCKETS_AGE_NUM];  /* allocations by age (seconds) */
-  uint32_t s_null_frees;
-  uint32_t s_failed_allocs;
-  uint32_t s_invalid_birthdays;
-  time_t   s_agebuckets_lastupdate;
+  uint32_t s_curr_sizealloc;
+  uint32_t s_curr_countalloc;
+  uint32_t s_total_countalloc;
+  uint32_t s_sizebucket[BUCKETS_SIZE_NUM]; /* allocations by size */
+  uint32_t s_agebucket[BUCKETS_AGE_NUM];  /* allocations by age (seconds) */
+  uint32_t s_null_free;
+  uint32_t s_fail_alloc;
+  time_t   s_last_ageupdate;
+  time_t   s_last_logupdate;
 
   /* internal debugging */
-  uint32_t _s_agebucket_underrun_error;
-  uint32_t _s_sizebucket_underrun_error;
-  uint32_t _s_lockerror;
-  uint32_t _s_declined_updates;
+  uint32_t _s_underrun_agebucket;
+  uint32_t _s_underrun_sizebucket;
+  uint32_t _s_errorlock;
+  uint32_t _s_declined_update;
+  uint32_t _s_invalid_birthday;
 };
 
 /* get a coherent copy of stats structure */

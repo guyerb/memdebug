@@ -20,9 +20,7 @@ int dmalloc_is_logging = 1;
    where noted)
 */
 
-/* find range (powers of 10) of age buckets with largest value
-   N.B -  brute forcing this.
- */
+/* find range (powers of 10) of age buckets with largest value */
 static int logline_power10_largest(uint32_t *p)
 {
   uint32_t largest = 0;
@@ -75,13 +73,13 @@ static uint32_t logline_scaler(uint32_t largest, uint32_t columns)
 static void logline_scaled(char *hdr, uint32_t count, uint32_t scale)
 {
   if (count < scale) {
-    dmalloc_printf("%15s: ", hdr);
+    dmalloc_printf("%-11s: ", hdr);
     if (count == 0) {
-      dmalloc_logf("%11s:\n", hdr);
+      dmalloc_logf("%-11s:\n", hdr);
       return;
     } else {
       if (count >= scale/2) 	/* round */
-	dmalloc_logf("%11s:#\n", hdr);
+	dmalloc_logf("%-11s:#\n", hdr);
       else
 	logline_scaled(hdr, count - scale, scale);
     }
@@ -94,20 +92,20 @@ static void logline_range_scaled(char *hdr, uint32_t *p, uint32_t floor, uint32_
 {
   uint32_t count = 0;
 
-  for (floor = floor; floor < ceiling; floor++) {
+  for ( ; floor < ceiling; floor++) {
     count += p[floor];
   }
   logline_scaled(hdr, count, scale);
 }
 
 /* a little recursive formatter from the interwebz cuz "%'d" didn't work*/
-void logline__commas (uint32_t n)
+void logline_commas (uint32_t n)
 {
     if (n < 1000) {
       dmalloc_logf ("%d", n);
         return;
     }
-    logline__commas(n/1000);
+    logline_commas(n/1000);
     dmalloc_logf (",%03d", n%1000);
 }
 
@@ -137,76 +135,61 @@ void dmalloc_stats_log()
   dmalloc_is_logging = 1;
   
   dmalloc_logf("========== %s: UTC %s ==========\n", DMALLOC_VERSION_STRING, pgm_str);
-  dmalloc_logf("Dmalloc stats:\n");
-  dmalloc_logf("%-30s", "overall allocations:" );
-  logline__commas(stats.s_allocated_alltime);
+  dmalloc_logf("%-26s", "overall allocations:" );
+  logline_commas(stats.s_total_countalloc);
   dmalloc_logf("\n");
-  dmalloc_logf("%-30s", "current allocations:" );
-  logline__commas(stats.s_allocated_current);
+  dmalloc_logf("%-26s", "current allocations:" );
+  logline_commas(stats.s_curr_countalloc);
+  dmalloc_logf("%-26s", "current alloc bytes:" );
+  logline_commas(stats.s_curr_sizealloc);
   dmalloc_logf("\n");
 
-#ifdef DMALLOC_STATS_UNIT
-  /* for debugging */
-  dmalloc_logf("\nInternal Stats enabled:\n");
-  dmalloc_logf("%-25s %5d\n", "age underruns:", stats._s_agebucket_underrun_error);
-  dmalloc_logf("%-25s %5d\n", "size underruns:", stats._s_sizebucket_underrun_error);
-  dmalloc_logf("%-25s %5d\n", "lock errors:", stats._s_lockerror);
-  dmalloc_logf("%-25s %5d\n", "declined updates:", stats._s_declined_updates);
+#ifdef DMALLOC_UNIT_TEST
+  dmalloc_logf("\ndebug stats enabled:\n");
+  dmalloc_logf("%-25s %d\n", "age underruns:", stats._s_underrun_agebucket);
+  dmalloc_logf("%-25s %d\n", "size underruns:", stats._s_underrun_sizebucket);
+  dmalloc_logf("%-25s %d\n", "lock errors:", stats._s_errorlock);
+  dmalloc_logf("%-25s %d\n", "declined updates:", stats._s_declined_update);
   dmalloc_logf("\n");
-#endif	/* DMALLOC_STATS_UNIT */
+#endif	/* DMALLOC_UNIT_TEST */
 
   /* dump age buckets */
-  uint32_t sz_largest = logline_power2_largest( (uint32_t *)&stats.s_sizebuckets, BUCKETS_SIZE_NUM);
-  uint32_t sz_scaler = logline_scaler(sz_largest, 65);
+  uint32_t sz_largest = logline_power2_largest( (uint32_t *)&stats.s_sizebucket, BUCKETS_SIZE_NUM);
+  uint32_t sz_scaler = logline_scaler(sz_largest, 68);
 
   dmalloc_logf("Current size allocations by bytes: ( one # represents %d bytes)\n", sz_scaler);
 
-  logline_scaled("0 - 4",		stats.s_sizebuckets[BUCKET_0000], sz_scaler);
-  logline_scaled("4 - 8",		stats.s_sizebuckets[BUCKET_0004], sz_scaler);
-  logline_scaled("8 - 16",	stats.s_sizebuckets[BUCKET_0008], sz_scaler);
-  logline_scaled("16 - 32",	stats.s_sizebuckets[BUCKET_0016], sz_scaler);
-  logline_scaled("32 - 64",	stats.s_sizebuckets[BUCKET_0032], sz_scaler);
-  logline_scaled("64 - 128",	stats.s_sizebuckets[BUCKET_0064], sz_scaler);
-  logline_scaled("128 - 256",	stats.s_sizebuckets[BUCKET_0128], sz_scaler);
-  logline_scaled("256 - 512",	stats.s_sizebuckets[BUCKET_0256], sz_scaler);
-  logline_scaled("512 - 1024",	stats.s_sizebuckets[BUCKET_0512], sz_scaler);
-  logline_scaled("1024 - 2048",	stats.s_sizebuckets[BUCKET_1024], sz_scaler);
-  logline_scaled("2048 - 4096",	stats.s_sizebuckets[BUCKET_2048], sz_scaler);
-  logline_scaled("4096 - infi",	stats.s_sizebuckets[BUCKET_4096], sz_scaler);
+  logline_scaled("0    -    4",	stats.s_sizebucket[BUCKET_0000], sz_scaler);
+  logline_scaled("4    -    8",	stats.s_sizebucket[BUCKET_0004], sz_scaler);
+  logline_scaled("8    -   16",	stats.s_sizebucket[BUCKET_0008], sz_scaler);
+  logline_scaled("16   -   32",	stats.s_sizebucket[BUCKET_0016], sz_scaler);
+  logline_scaled("32   -   64",	stats.s_sizebucket[BUCKET_0032], sz_scaler);
+  logline_scaled("64   -  128",	stats.s_sizebucket[BUCKET_0064], sz_scaler);
+  logline_scaled("128  -  256",	stats.s_sizebucket[BUCKET_0128], sz_scaler);
+  logline_scaled("256  -  512",	stats.s_sizebucket[BUCKET_0256], sz_scaler);
+  logline_scaled("512  - 1024",	stats.s_sizebucket[BUCKET_0512], sz_scaler);
+  logline_scaled("1024 - 2048",	stats.s_sizebucket[BUCKET_1024], sz_scaler);
+  logline_scaled("2048 - 4096",	stats.s_sizebucket[BUCKET_2048], sz_scaler);
+  logline_scaled("4096 - infi",	stats.s_sizebucket[BUCKET_4096], sz_scaler);
+  dmalloc_logf("\n");
 
   /* dump size buckets */
-  uint32_t age_largest = logline_power10_largest( (uint32_t *)&stats.s_agebuckets);
-  uint32_t age_scaler = logline_scaler(age_largest, 65);
+  uint32_t age_largest = logline_power10_largest( (uint32_t *)&stats.s_agebucket);
+  uint32_t age_scaler = logline_scaler(age_largest, 68);
 
   dmalloc_logf("Current age allocations by bytes: ( one # represents %d bytes)\n", age_scaler);
-  logline_range_scaled("< 10 sec",    stats.s_sizebuckets, 0, 9, age_scaler);
-  logline_range_scaled("< 100 sec",   stats.s_sizebuckets, 10, 99, age_scaler);
-  logline_range_scaled("< 1000 sec",  stats.s_sizebuckets, 100, 999, age_scaler);
-  logline_range_scaled(">= 1000 sec", stats.s_sizebuckets, 999, 1000, age_scaler);
+  logline_range_scaled("<    10 sec", stats.s_sizebucket, 0, 9, age_scaler);
+  logline_range_scaled("<   100 sec", stats.s_sizebucket, 10, 99, age_scaler);
+  logline_range_scaled("<  1000 sec", stats.s_sizebucket, 100, 999, age_scaler);
+  logline_range_scaled(">= 1000 sec", stats.s_sizebucket, 999, 1000, age_scaler);
 
   dmalloc_is_logging = 0;  
 
-/*   >>>>>>>>>>>>> Sat Jan 6 00:36:26 UTC 2018 <<<<<<<<<<< */
-
-/* 			Overall stats: */
-/* 6,123,231 Overall allocations since start */
-/* 84.3MiB Current total allocated size */
-/* Current allocations by size: ( # = 8,123 current allocations) */
-/* 0 - 4 bytes: ########## */
-/* 4 - 8 bytes: */
-/* 8 - 16 bytes: #### */
-/* 16 - 32 bytes: */
-/* 32 - 64 bytes: */
-/* 64 - 128 bytes: */
-/* 128 - 256 bytes: */
-/* 256 - 512 bytes: # */
-/* 512 - 1024 bytes: # */
-/* 1024 - 2048 bytes: # */
-/*  2048 - 4096 bytes: # */
-/* 4096 + bytes: ####### */
-/* Current allocations by age: ( # = 8,123 current allocations) < 1 sec: ### */
-/* < 10 sec: ## */
-/* < 100 sec: ## */
-/* < 1000 sec: ######################### */
-/* > 1000 sec: */
 }
+
+#ifdef DMALLOC_UNIT_TEST
+
+void  dmalloc_ut_logging()
+{
+}
+#endif	/* DMALLOC_UNIT_TEST */
