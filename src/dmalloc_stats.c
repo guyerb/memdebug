@@ -194,7 +194,7 @@ void dmalloc_stats_delim()
 void dmalloc_stats_start( char *descr)
 {
   puts("---------------------------------------------------------------------");
-  printf("DMALLOC UNIT TESTS  %s:\n\n", descr);
+  printf("DMALLOC UNIT TESTS%s:\n\n", descr);
 }
 
 void dmalloc_stats_check(char *descr, uint32_t expected, uint32_t actual)
@@ -289,7 +289,6 @@ int main()
   dmalloc_stats_check("current allocation", bytes, dmalloc_stats.s_allocated_current);
   dmalloc_stats_check("alltime allocation", bytes, dmalloc_stats.s_allocated_alltime);
   dmalloc_stats_check("age  bucket 0", 15, dmalloc_stats.s_agebuckets[BUCKET_0000]);
-
   dmalloc_stats_check("size bucket 0", 3, dmalloc_stats.s_sizebuckets[BUCKET_0000]);
   dmalloc_stats_check("size bucket 1", 1, dmalloc_stats.s_sizebuckets[BUCKET_0004]);
   dmalloc_stats_check("size bucket 2", 1, dmalloc_stats.s_sizebuckets[BUCKET_0008]);

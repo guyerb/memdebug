@@ -19,11 +19,16 @@ int dmalloc_is_logging = 1;
    the next few support routines are recursive (from the interwebz
    where noted)
 */
+
+/* find size bucket with most bytes, assuming max bytes per bucket */
 static uint32_t logline_largest(uint32_t *p, size_t len)
 {
   uint32_t largest = 0;
+  uint8_t exp = 2;		/* start on the 0-4 bucket  */
+
   for (uint32_t i=0; i<len; i++) {
-    if (p[i] > largest) largest = p[i];
+    uint32_t bytes = p[i] * ((exp << (i + 1)) -1); /* (0+1) - 1 = 0 (2<2) -1 = 7 ...*/
+    if (bytes > largest) largest = bytes;
   }
   return largest;
 }
@@ -32,9 +37,10 @@ static uint32_t logline_largest(uint32_t *p, size_t len)
 static uint32_t logline_scaler(uint32_t largest, uint32_t columns)
 {
   uint32_t scaler = 0;
-  
+
   if (largest <= columns)
     return 1;
+
   scaler += logline_scaler(largest - columns, columns);
   return scaler;
 }
@@ -46,7 +52,9 @@ static void logline_print_scaled(char *hdr, uint32_t count, uint32_t scale)
     dmalloc_printf("%-15s: ", hdr);
     if (count != 0) {
       if (count >= scale/2) 	/* round */
-	dmalloc_logf("#");
+	dmalloc_logf("%s:#", hdr);
+      else
+	dmalloc_logf("%s:", hdr);
       return;
     } else {
       logline_print_scaled(hdr, count - scale, scale);
@@ -114,7 +122,7 @@ void dmalloc_stats_log()
   uint32_t largest = logline_largest( (uint32_t *)&stats.s_sizebuckets, BUCKETS_SIZE_NUM);
   uint32_t scaler = logline_scaler(largest, 65);
 
-  dmalloc_logf("Current size allocations by bytes: ( one # is %d bytes)\n", scaler);
+  dmalloc_logf("Current size allocations by bytes: ( one # represents %d bytes)\n", scaler);
 
   logline_print_scaled("0 - 4",		stats.s_sizebuckets[BUCKET_0000], scaler);
   logline_print_scaled("4 - 8",		stats.s_sizebuckets[BUCKET_0004], scaler);
