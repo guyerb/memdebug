@@ -194,7 +194,7 @@ void dmalloc_stats_delim()
 void dmalloc_stats_start( char *descr)
 {
   puts("---------------------------------------------------------------------");
-  printf("DMALLOC UNIT TESTS%s:\n\n", descr);
+  printf("DMALLOC UNIT TESTS - %s:\n\n", descr);
 }
 
 void dmalloc_stats_check(char *descr, uint32_t expected, uint32_t actual)

@@ -49,18 +49,19 @@ static uint32_t logline_scaler(uint32_t largest, uint32_t columns)
 static void logline_print_scaled(char *hdr, uint32_t count, uint32_t scale)
 {
   if (count < scale) {
-    dmalloc_printf("%-15s: ", hdr);
-    if (count != 0) {
-      if (count >= scale/2) 	/* round */
-	dmalloc_logf("%s:#", hdr);
-      else
-	dmalloc_logf("%s:", hdr);
+    dmalloc_printf("%15s: ", hdr);
+    if (count == 0) {
+      dmalloc_logf("%11s:\n", hdr);
       return;
     } else {
-      logline_print_scaled(hdr, count - scale, scale);
+      if (count >= scale/2) 	/* round */
+	dmalloc_logf("%11s:#\n", hdr);
+      else
+	logline_print_scaled(hdr, count - scale, scale);
     }
+  } else {
+    dmalloc_logf("#");
   }
-  dmalloc_logf("#");
 }
 
 /* a little recursive formatter from the interwebz cuz "%'d" didn't work*/
@@ -135,7 +136,7 @@ void dmalloc_stats_log()
   logline_print_scaled("512 - 1024",	stats.s_sizebuckets[BUCKET_0512], scaler);
   logline_print_scaled("1024 - 2048",	stats.s_sizebuckets[BUCKET_1024], scaler);
   logline_print_scaled("2048 - 4096",	stats.s_sizebuckets[BUCKET_2048], scaler);
-  logline_print_scaled("4096 +",	stats.s_sizebuckets[BUCKET_4096], scaler);
+  logline_print_scaled("4096 - infi",	stats.s_sizebuckets[BUCKET_4096], scaler);
 
   dmalloc_is_logging = 0;  
 
