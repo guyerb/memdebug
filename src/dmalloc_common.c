@@ -1,18 +1,23 @@
+#define _POSIX_C_SOURCE  200809L /* get flockfile */
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdint.h>
+
 #include "dmalloc_common.h"
 
 int is_logging = 0;
 
 void dmalloc_log_protect()
 {
-  is_logging = 1;
+  flockfile(stderr);	/* prevent output corruption from concurrency */
+  is_logging = 1;	/* prevent output corruption from reentrancy */
 }
 
 void dmalloc_log_unprotect()
 {
   is_logging = 0;
+  funlockfile(stderr);
 }
 
 void dmalloc_logf( const char* format, ... )

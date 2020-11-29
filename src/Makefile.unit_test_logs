@@ -1,10 +1,11 @@
 # -*- MakeFile -*-
 # 
-# unit test for stat and logging subsystem
+# unit test for logging subsystem
 #
 
 objects := dmalloc_log.o dmalloc_common.o
 depends := $(objects:.o=.d)
+target  := ut-logs
 
 uname := $(shell uname -s)
 ifeq ($(uname), Linux)
@@ -18,10 +19,10 @@ endif
 	gcc -g -std=c99 -Wall -Wextra -D DMALLOC_UNIT_TEST -D $(os) -c  $<  -o $@
 	@gcc -MM $*.c > $*.d
 
-ut-logs: $(objects)
+$(target): $(objects)
 	gcc -g  $^  -o $@	
 
 clean:
-	rm -f *.o *.d *~ ut
+	rm -f *.o *.d *~ $(target)
 
 -include $(depends)
