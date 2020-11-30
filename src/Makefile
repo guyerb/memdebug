@@ -1,6 +1,5 @@
 # -*- MakeFile -*-
-
-objects := dmalloc.o dmalloc_stats.o dmalloc_api.o dmalloc_common.o dmalloc_log.o
+objects := dmalloc.o dmalloc_stats.o dmalloc_common.o dmalloc_log.o
 depends := $(objects:.o=.d)
 unit_tests := ut-logs ut-stats ut-wrap
 

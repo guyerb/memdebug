@@ -21,10 +21,10 @@ void * dmalloc_calloc_intercept(size_t count, size_t size)
   dputc('c', stderr);
 
   /* alloc bytes and hide our birthday inside */
-  ptr = libc_calloc_wrapper(count, size + dmalloc_birthday_sz());
+  ptr = libc_calloc_wrapper(count, size + dmalloc_cookies_sz());
   if (ptr) {
-    ptr = dmalloc_birthday_setandhide(ptr, now);
-    dmalloc_stats_alloc(dmalloc_usable_size(ptr), now);
+    ptr = dmalloc_cookies_setandhide(ptr, now, size);
+    dmalloc_stats_alloc(size, now);
   }
 
   return ptr;
@@ -35,8 +35,8 @@ void dmalloc_free_intercept(void *ptr)
   dputc('f', stderr);
 
   if (dmalloc_ptr_ours(ptr)) {
-    dmalloc_stats_free(dmalloc_usable_size(ptr), time(NULL),
-    		     dmalloc_birthday_get(ptr));
+    dmalloc_stats_free(dmalloc_size_get(ptr), time(NULL), \
+		       dmalloc_birthday_get(ptr));
     ptr = dmalloc_basepointer_get(ptr);
   }
   libc_free_wrapper(ptr);
@@ -51,9 +51,9 @@ void * dmalloc_malloc_intercept(size_t size)
 
   dputc('m', stderr);
   /* alloc bytes and hide our birthday inside */
-  ptr = libc_malloc_wrapper(size + dmalloc_birthday_sz());
-  ptr = dmalloc_birthday_setandhide(ptr, now);
-  dmalloc_stats_alloc(dmalloc_usable_size(ptr), now);
+  ptr = libc_malloc_wrapper(size + dmalloc_cookies_sz());
+  ptr = dmalloc_cookies_setandhide(ptr, now, size);
+  dmalloc_stats_alloc(size, now);
 
   return ptr;
 }
@@ -65,15 +65,19 @@ void * dmalloc_realloc_intercept(void *ptr, size_t size)
   time_t now = time(NULL);
 
   dputc('r', stderr);
-  dmalloc_stats_free(dmalloc_usable_size(ptr), now, \
-		     dmalloc_birthday_get(ptr));
 
-  /* alloc bytes and hide birthday inside */
-  p = libc_realloc_wrapper(ptr, size + dmalloc_birthday_sz());
+  if (dmalloc_ptr_ours(ptr)) {
+    dmalloc_stats_free(dmalloc_size_get(ptr), time(NULL),	\
+		       dmalloc_birthday_get(ptr));
+    ptr = dmalloc_basepointer_get(ptr);
+  }
+
+  /* alloc bytes and hide new birthday and size inside */
+  p = libc_realloc_wrapper(ptr, size + dmalloc_cookies_sz());
 
   if (p) {
-    p = dmalloc_birthday_setandhide(ptr, time(NULL));
-    dmalloc_stats_alloc(dmalloc_usable_size(p), now);
+    p = dmalloc_cookies_setandhide(ptr, now, size);
+    dmalloc_stats_alloc(size, now);
   }
 
   return p;
@@ -220,33 +224,41 @@ int main()
 
   ut_check("bad magic", 0, dmalloc_ptr_ours(&buf[50]));
 
+  /* | MAGIC | TSTAMP | SZ | USER DATA | */
   uint32_t *pm = (uint32_t *)buf;
-  time_t *pt = (time_t *)(pm + 1);
+  time_t *pt = (time_t *)((uint8_t *)(buf + MSIZE));
+  size_t *ps = (size_t *)((uint8_t *)(buf + MSIZE + TSIZE));
   time_t now = time(NULL);
 
   *pm = DMAGIC;
   *pt = now;
+  *ps = 12;
 
-  ut_check_sz("magic area size", DSIZE, dmalloc_birthday_sz());
+  ut_check_sz("magic area size", DSIZE, dmalloc_cookies_sz());
+  ut_check_sz("ptr sz", 12, dmalloc_size_get(buf + DSIZE));
+  ut_check_sz("ptr birthday", now, dmalloc_birthday_get(buf + DSIZE));
   ut_check("good magic manual", 1, dmalloc_ptr_ours(buf + DSIZE));
+
   ut_set(buf, 0xff, 64);
 
   void *pb = buf;
-  pb = dmalloc_birthday_setandhide(pb, now);
+  pb = dmalloc_cookies_setandhide(pb, now, 12);
   ut_check_ptr("set and hide", buf + DSIZE, pb);
   ut_check_ptr("check base ptr", buf, dmalloc_basepointer_get(pb));
   ut_check_time("check birthday", now, dmalloc_birthday_get(pb));
+  ut_check_sz("check size", 12, dmalloc_size_get(pb));
 
   ut_start("exercise intercept routines");
   ut_delim();
   ut_check("libc constructors valid", 1, libc_wrappers_initialized());
-  
-  void *p = malloc(12);
-  ut_check("good magic in malloc", 1, dmalloc_ptr_ours(p));
-  free(p);
-  p = calloc(1, 12);
-  free(p);
-  
+
+  for (int i = 0; i < 5; i++) {
+    void *p = malloc(12);
+    free(p);
+    p = calloc(1, 12);
+    free(p);
+  }
+  dmalloc_log_stats();
 }
 
 #endif  /* DMALLOC_UNIT_TEST_WRAPPERS */

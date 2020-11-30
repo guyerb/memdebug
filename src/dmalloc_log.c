@@ -48,7 +48,7 @@ static int logline_agebucket_largest()
 static uint32_t bucket_bytes_approx(uint32_t ndx)
 {
   uint32_t multiplier = 0;
-  
+
   switch (ndx) {
   case BUCKET_0000:
     multiplier = 2;
@@ -167,7 +167,7 @@ static void logline_scaled(char *hdr, uint32_t count, uint32_t scale)
 
   if (count < scale) {
     if (scale > 1)
-      dmalloc_logf("."); 	/* partial # */
+      dmalloc_logf(".");	/* partial # */
   } else {
     dmalloc_logf("#");
     depth++;
@@ -247,6 +247,11 @@ void dmalloc_log_stats()
   uint32_t sz_largest = logline_sizebucket_largest();
   uint32_t sz_scaler = logline_scaler(sz_largest, 68);
 
+  /* this graph is a little weird, it doesn't show the number of
+     allocations for that bucket but rather roughly the number of
+     bytes living in allocations of that size. Obviously useful but
+     definiately should add another chart which shows the distribution
+     of allocation sizes */
   dmalloc_logf("histogram: allocation size: (one # represents approx %d bytes)\n", sz_scaler);
   logline_scaled("0    -    4",	bucket_bytes_approx(BUCKET_0000), sz_scaler);
   logline_scaled("4    -    8",	bucket_bytes_approx(BUCKET_0004), sz_scaler);
@@ -368,7 +373,7 @@ int main()
   stats.s_agebucket[90] = 1000;
   stats.s_agebucket[900] = 10000;
   stats.s_agebucket[999] = 100000;
-  
+
   dmalloc_log_stats();
 }
 #endif	/* DMALLOC_UNIT_TEST */

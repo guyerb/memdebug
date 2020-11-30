@@ -1,0 +1,55 @@
+
+
+root@ac068f733357:/home/ubuntu/dev/src# make -f Makefile.unit_test_wrappers clean
+rm -f *.o *.d *~ ut-wrap
+root@ac068f733357:/home/ubuntu/dev/src# make -f Makefile.unit_test_wrappers
+gcc -g -std=c99 -Wall -Wextra -D DMALLOC_UNIT_TEST_WRAPPERS -D LINUX -c  dmalloc.c  -o dmalloc.o
+gcc -g -std=c99 -Wall -Wextra -D DMALLOC_UNIT_TEST_WRAPPERS -D LINUX -c  dmalloc_common.c  -o dmalloc_common.o
+gcc -g -std=c99 -Wall -Wextra -D DMALLOC_UNIT_TEST_WRAPPERS -D LINUX -c  dmalloc_stats.c  -o dmalloc_stats.o
+gcc -g -std=c99 -Wall -Wextra -D DMALLOC_UNIT_TEST_WRAPPERS -D LINUX -c  libc_wrappers_linux.c  -o libc_wrappers_linux.o
+gcc -g -std=c99 -Wall -Wextra -D DMALLOC_UNIT_TEST_WRAPPERS -D LINUX -c  dmalloc_log.c  -o dmalloc_log.o
+gcc -g  dmalloc.o dmalloc_common.o dmalloc_stats.o libc_wrappers_linux.o dmalloc_log.o  -ldl -o ut-wrap
+root@ac068f733357:/home/ubuntu/dev/src# ./ut-wrap
+c 0x7f47a8240170, f 0x7f47a823da30, m 0x7f47a823d140 r 0x7f47a823ed70
+---------------------------------------------------------------------
+DMALLOC UNIT TESTS - exercise intercept support routines:
+
+unit total tests 0 passed 0 failed 0
+bad magic                      PASSED_  expected          0 actual          0
+magic area size                PASSED_  expected         20 actual         20
+ptr sz                         PASSED_  expected         12 actual         12
+ptr birthday                   PASSED_  expected 1606715878 actual 1606715878
+good magic manual              PASSED_  expected          1 actual          1
+set and hide                   PASSED_  expected 0x7ffffa8497b4 actual 0x7ffffa8497b4
+check base ptr                 PASSED_  expected 0x7ffffa8497a0 actual 0x7ffffa8497a0
+check birthday                 PASSED_  expected   5fc489e6 actual   5fc489e6
+check size                     PASSED_  expected         12 actual         12
+---------------------------------------------------------------------
+DMALLOC UNIT TESTS - exercise intercept routines:
+
+unit total tests 9 passed 9 failed 0
+libc constructors valid        PASSED_  expected          1 actual          1
+========== dmalloc v0.4: UTC Mon Nov 30 05:57:58 2020 ==========
+overall allocations:      1,144
+current allocations:      1,024
+current alloc bytes:      0
+histogram: allocation size: (one # represents approx 23 bytes)
+0    -    4: .
+4    -    8: .
+8    -   16: .
+16   -   32: .
+32   -   64: .
+64   -  128: .
+128  -  256: .
+256  -  512: .
+512  - 1024: .
+1024 - 2048: ##################################################################.
+2048 - 4096: .
+4096 - infi: .
+
+histogram: allocations age: (one # represents appox 1  allocs)
+<    10 sec: #
+<   100 sec:
+<  1000 sec:
+>= 1000 sec:
+root@ac068f733357:/home/ubuntu/dev/src#

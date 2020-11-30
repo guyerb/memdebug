@@ -76,13 +76,15 @@ void libc_free_wrapper(void *ptr)
 {
   dputc('F', stderr);
   if (ptr >= (void *)dmalloc_preinit_buffer &&
-      ptr < (void *)(dmalloc_preinit_buffer + sizeof(dmalloc_preinit_buffer))) {
+      ptr < ((void *)(dmalloc_preinit_buffer + sizeof(dmalloc_preinit_buffer)))) {
     dputc('e', stderr);
   } else {
-    if (libc_freep)
+    if (libc_freep) {
+      dputc('>', stderr);
       libc_freep(ptr);
-    else
-      dputc('?', stderr);
+    } else {
+      dputc('?', stderr);	/* we can leak a bit on load (maybe a shell allocation? */
+    }
   }
 }
 

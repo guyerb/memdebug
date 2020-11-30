@@ -32,7 +32,7 @@ void dmalloc_stats_getter(struct dmalloc_alloc_stats *pcopy)
  */
 static void dmalloc_agebuckets_update(time_t now)
 {
-  time_t elapsed; 
+  time_t elapsed;
 
   if (pthread_mutex_lock(&dmalloc_stats_mutex) == 0) {
     elapsed = now - dmalloc_stats.s_last_ageupdate;

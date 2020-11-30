@@ -2,7 +2,6 @@ dmalloc library - see ChangeLog for version info
 
 INTRODUCTION
 LD_PRELOAD and SYMBOL FISHING
-API
 OUTPUT
 NOTES
 PROBLEMS
@@ -47,9 +46,45 @@ have a look at the 'check' target in test/Makefile and the source code
 for the library under 'src'
 
 ==================================================================
-API
+OUTPUT
 
-TBD
+Output of stats to stderr is at most once every five seconds but may
+be longer. Following is come representative log output. The
+allocations size histogram is a little odd as it doesn't express the
+number of allocations in a size range but rather the number of bytes
+kiving in allocations in that range. It would be useful to log both
+histograms.
+
+========== dmalloc v0.5: UTC Sun Nov 29 00:57:09 2020 ==========
+overall allocations:      4,294,967,295
+current allocations:      4,294,967,295
+current alloc bytes:      0
+
+debug stats enabled:
+age underruns:            0
+size underruns:           0
+lock errors:              0
+declined updates:         0
+
+histogram: allocation size: (one # represents approx 90353 bytes)
+0    -    4: .
+4    -    8: .
+8    -   16: .
+16   -   32: .
+32   -   64: .
+64   -  128: #.
+128  -  256: ##.
+256  -  512: ####.
+512  - 1024: ########.
+1024 - 2048: ################.
+2048 - 4096: #################################.
+4096 - infi: ###################################################################.
+
+histogram: allocations age: (one # represents appox 1471  allocs)
+<    10 sec: .
+<   100 sec: .
+<  1000 sec: ######.
+>= 1000 sec: ###################################################################.
 
 
 ==================================================================
@@ -62,45 +97,23 @@ Current allocations by age: ( # = 8,123 current allocations)
 < 1000 sec: ######################### > 1000 sec:
 
 
-The above is one of the stat output lines. At first I was convinced
-that I would need to keep a list of all allocated pointers and the
-time they were allocated so that I could compute the age buckets. This
-seemed like a daunting task (space, time, and complexity).
-
-Fortunately, there is an easier way. Keeping an array of 1000 entries
-is sufficient. Each "bucket" holds the count of allocations sharing
-that birthday. For instance, a count of 3 at index 4 (the 5th
-position) indicates we have 3 allocations that have persisted for five
-seconds. We update the list opportunistically and only if the elapsed
-time since the last update is more than one second.
+We keep an array of 1000 age buckets each holds the count of
+allocations sharing that birthday. For instance, a count of 3 at index
+4 (the 5th position) indicates we have 3 allocations that have
+persisted for five seconds. We update the list opportunistically and
+only if the elapsed time since the last update is more than one
+second.
 
 There is a loss of accuracy in the first bucket. We don't know how
 long an allocation has really existed during that first second. It may
 have enetered that bucket only a few milliseconds before a one second
 boundary and then finds itself quickly promoted to the next
 bucket. For subsequent time slots all promotions are accurate,
-i.e. more errors don't accumulate.
+i.e. errors don't accumulate.
 
 We hide some birthday magic in extra bytes in the header of each
 allocation so that on free() we can decrement the count in the correct
-bucket.
-
-We do incur the cost of traversing a 1000 element list of integers to
-do the update so this should be undertaken only as needed but is not
-hugely expensive.
-
-Algorithm becomes basically;
-
-alloc()
-	new allocation
-	note birthday
-	update current list if last update more than one second ago
-	increment time 0 bucket
-
-free()
-	extract birthday
-	free allocation
-	decrement count at computed bucket
+bucket as well as the count of allocated bytes.
 
 NOTES - REENTRANCY
 
@@ -113,53 +126,23 @@ the library via some flag and if so then we simply call through to the
 libc routine without doing any more processing. This will allow any
 printf() or other routines that we are performing to cause problem.
 
-NOTES - CONCURRENCY
-
-TBD
-
-
 ==================================================================
 PROBLEMS
 
-* CORRUPT BIRTHDAYS
-
-The code as written hides a birthday timestamp in a user
-allocation. There is no 'magic' in that stamp to recognize if it is
-valid or corrupted and the free() code will happily attempt to use
-whatever it finds there albeit with some basic validity checking.
+* TRACKING TOTALS Tracking total allocated bytes can be tricky. Some
+  libraries allocate memory on the first call and don't free it
+  (printf). When loading a program from the shell we may end up
+  intercepting free calls for memory we didn't allocate.
 
 
-* TRACKING TOTALS
-Tracking total allocated bytes can be very tricky as come short lived
-programs do not free() allocated memory and instead run to completion
-and count on the OS to simply free any allocated heap areas. Thus a
-simple Hello World program can easily show many mallocs without
-associated frees as demonstrated in the following output.
-
-DYLD_INSERT_LIBRARIES=../src/libdmalloc.dylib DYLD_FORCE_FLAT_NAMESPACE=1 ./hello_world
-malloc(23949,0x110734dc0) malloc: my_malloc: 0x7fd7de808200 = malloc(1536)
-malloc(23949,0x110734dc0) malloc: my_malloc: 0x7fd7de5040f0 = malloc(32)
-malloc(23949,0x110734dc0) malloc: my_free: free(0x7fd7de504110)
-malloc(23949,0x110734dc0) malloc: my_free: free(0x7fd7de5040e0)
-malloc(23949,0x110734dc0) malloc: my_free: free(0x7fd7de504130)
-malloc(23949,0x110734dc0) malloc: my_malloc: 0x7fd7de504130 = malloc(32)
-malloc(23949,0x110734dc0) malloc: my_calloc: 0x7fd7de5043c0 = calloc(32 1)
-malloc(23949,0x110734dc0) malloc: my_calloc: 0x7fd7de5043e0 = calloc(32 1)
-malloc(23949,0x110734dc0) malloc: my_calloc: 0x7fd7de504400 = calloc(32 1)
-malloc(23949,0x110734dc0) malloc: my_calloc: 0x7fd7de504420 = calloc(32 1)
-malloc(23949,0x110734dc0) malloc: my_calloc: 0x7fd7de504440 = calloc(32 1)
-malloc(23949,0x110734dc0) malloc: my_calloc: 0x7fd7de504460 = calloc(32 1)
-malloc(23949,0x110734dc0) malloc: my_calloc: 0x7fd7de504480 = calloc(32 1)
-malloc(23949,0x110734dc0) malloc: my_calloc: 0x7fd7de5044a0 = calloc(32 1)
-.... it goes on for sometime with very few free() calls.
 
 ==================================================================
 TODO
 
-	* realloc() - Currently realloc() statistics gathers treats a
-	  realloc as a free followed by an alloc. This loses precision
-	  on the lifetime of the allocation. A better implementation
-	  might notice that the base pointer has not changed and
-	  simnply update the total bytes allocated as a result.
+*  realloc() - Currently realloc() statistics gathers treats a realloc
+as a free followed by an alloc. This loses precision on the lifetime
+of the allocation. A bettr implementation might notice that the base
+pointer has not changed and simnply update the total bytes allocated
+as a result.
 
 
