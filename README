@@ -11,20 +11,45 @@ TODO
 INTRODUCTION
 
 This is a malloc/calloc/realloc/free debug libary (located in 'src')
-and an associated test program (located in 'test'). To see the test
-code in action then from the terminal and inside the dmalloc directory
-type:
+and an associated test program (located in 'test'). The library has
+been designed and tested on Linux but should run on Mac OS with
+minimal debug. To see the test code in action then from the terminal
+and inside the dmalloc directory type:
 
-      make check
-
+      make && make check
 
 A variety of debug information will be printed on stderr every five
-seconds or thereabouts. More on output format in OUTPUT
+seconds or thereabouts. More on the output format in OUTPUT below.
 
 It is not necessary to recompile your application to use this library
 as it intercepts malloc type routines (see LD_PRELOAD below). There is
 a control API if you desire to explicitly link against the library and
 control aspects of its operation (see API below)
+
+Other interesting build targests:
+
+     make clean  // removes intermediate targets and executables
+
+     make distclean // same as clean but also remove compiled libraries
+
+From the src directory you can build and run unit tests:
+
+     make clean && make -f Makefile.unit_test_logs
+
+     make clean && make -f Makefile.unit_test_stats
+
+     make clean && make -f Makefile.unit_test_wrappers
+
+There are some interesting debug options. In src/Makefile you can add:
+
+      -D DMALLOC_PASSTHROUGH 	 - this will basically bypass all accounting
+
+      -D DMALLOC_DEBUG		 - enable dputc (cryptic, but helpful)
+
+printf() debugging will get you in trouble in a hurry cuz
+reentrancy. You may find it easier to develop and debug in one of the
+unit test projects where printf() and others behave themselves much
+better.
 
 ==================================================================
 LD_PRELOAD and SYMBOL FISHING
@@ -45,15 +70,23 @@ To see how preload and symbol fishing are accomplished under MAC OSX
 have a look at the 'check' target in test/Makefile and the source code
 for the library under 'src'
 
+WARNING
+
+You could setup your entire system to use this libary by overriding
+LD_PRELOAD system wide or by installing this libary in such a way that
+it is found first. This is not recommended and should you do so then
+make sure you have a way to recover.
+
 ==================================================================
 OUTPUT
 
 Output of stats to stderr is at most once every five seconds but may
-be longer. Following is come representative log output. The
-allocations size histogram is a little odd as it doesn't express the
-number of allocations in a size range but rather the number of bytes
-kiving in allocations in that range. It would be useful to log both
-histograms.
+be longer. If the program being monitored is not making
+allocation/free calls then there may not be any output. Following is
+come representative log output. The allocations size histogram is a
+little odd as it doesn't express the number of allocations in a size
+range but rather the number of bytes kiving in allocations in that
+range. It would be useful to log both histograms.
 
 ========== dmalloc v0.5: UTC Sun Nov 29 00:57:09 2020 ==========
 overall allocations:      4,294,967,295
@@ -134,7 +167,9 @@ PROBLEMS
   (printf). When loading a program from the shell we may end up
   intercepting free calls for memory we didn't allocate.
 
-
+* The library stores cookies before the user allocation. As implemnted
+  this would unalign calls to valloc() and aligned_alloc() so they are
+  unimplemented for now.
 
 ==================================================================
 TODO

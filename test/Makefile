@@ -1,7 +1,4 @@
 # -*- MakeFile -*-
-#libdir := $(CURDIR)/../src
-#gcc -g   $^  -o $@ -L $(libdir)  -ldmalloc
-
 target = checks
 
 uname := $(shell uname -s)
@@ -20,12 +17,7 @@ $(target): checks.o
 	gcc -g   $^  -o $@
 
 check: $(target)
-	@echo Run 1 with standard malloc calls
-	@echo ----------------------------
-	./$(target)
-	@echo ----------------------------
-	@echo
-	@echo Run 2 with injected malloc calls
+	@echo run with injected malloc calls
 	@echo ----------------------------
 	 $(preload) ./$(target)
 	@echo ----------------------------

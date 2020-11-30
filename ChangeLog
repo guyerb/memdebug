@@ -2,6 +2,7 @@ ChangeLog for dmalloc
 2020-11-29 - v0.6
 	* unit testing and bug fixes on wrappers
 	(cd src && make -f Makefile.unit_test_wrappers && ./ut-wrap)
+	* bug fixes for realloc() and mutex locking
 2020-11-28 - v0.5
 	* unit testing and bug fixes on logs and stats
 	(cd src && make -f Makefile.unit_test_logs && ./ut-logs)

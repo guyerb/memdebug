@@ -2,7 +2,7 @@
 // Update these when the version changes
 
 #define dmalloc_major 0
-#define dmalloc_minor 5
+#define dmalloc_minor 6
 
 #define XSTR(x) STR(x)
 #define STR(x) #x

@@ -15,7 +15,7 @@ ifeq ($(uname), Darwin)
 endif
 
 %.o: %.c
-	gcc -g -std=c99 -Wall -Wextra -D DMALLOC_DEBUG -D $(os) -c  $<  -fPIC  -o $@
+	gcc -g -std=c99 -Wall -Wextra -D $(os) -c  $<  -fPIC  -o $@
 	@gcc -MM $*.c > $*.d
 
 $(target): $(objects)

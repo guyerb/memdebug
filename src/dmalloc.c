@@ -13,34 +13,30 @@
 #include "dmalloc_common.h"
 #include "libc_wrappers.h"
 
+#ifndef DMALLOC_PASSTHROUGH
 void * dmalloc_calloc_intercept(size_t count, size_t size)
 {
-  void *ptr;
+  void *ptr = NULL;
   time_t now = time(NULL);
 
   dputc('c', stderr);
-
-  /* alloc bytes and hide our birthday inside */
-  ptr = libc_calloc_wrapper(count, size + dmalloc_cookies_sz());
+  ptr = libc_calloc_wrapper(count, size + DSIZE);
   if (ptr) {
     ptr = dmalloc_cookies_setandhide(ptr, now, size);
     dmalloc_stats_alloc(size, now);
   }
-
   return ptr;
 }
 
 void dmalloc_free_intercept(void *ptr)
 {
   dputc('f', stderr);
-
   if (dmalloc_ptr_ours(ptr)) {
     dmalloc_stats_free(dmalloc_size_get(ptr), time(NULL), \
 		       dmalloc_birthday_get(ptr));
     ptr = dmalloc_basepointer_get(ptr);
   }
   libc_free_wrapper(ptr);
-
   return;
 }
 
@@ -50,38 +46,74 @@ void * dmalloc_malloc_intercept(size_t size)
   void *ptr;
 
   dputc('m', stderr);
-  /* alloc bytes and hide our birthday inside */
-  ptr = libc_malloc_wrapper(size + dmalloc_cookies_sz());
-  ptr = dmalloc_cookies_setandhide(ptr, now, size);
-  dmalloc_stats_alloc(size, now);
-
+  ptr = libc_malloc_wrapper(size + DSIZE);
+  if (ptr) {
+    ptr = dmalloc_cookies_setandhide(ptr, now, size);
+    dmalloc_stats_alloc(size, now);
+  }
   return ptr;
 }
 
-/* see TODO in README for thoughts on a better implementation */
 void * dmalloc_realloc_intercept(void *ptr, size_t size)
 {
   void *p;
   time_t now = time(NULL);
 
   dputc('r', stderr);
-
-  if (dmalloc_ptr_ours(ptr)) {
+  if (ptr && dmalloc_ptr_ours(ptr)) {
     dmalloc_stats_free(dmalloc_size_get(ptr), time(NULL),	\
 		       dmalloc_birthday_get(ptr));
     ptr = dmalloc_basepointer_get(ptr);
   }
 
-  /* alloc bytes and hide new birthday and size inside */
   p = libc_realloc_wrapper(ptr, size + dmalloc_cookies_sz());
-
   if (p) {
-    p = dmalloc_cookies_setandhide(ptr, now, size);
+    p = dmalloc_cookies_setandhide(p, now, size);
     dmalloc_stats_alloc(size, now);
   }
-
   return p;
 }
+
+void * dmalloc_reallocf_intercept(void *ptr, size_t size)
+{
+  return dmalloc_realloc_intercept(ptr, size);
+}
+#else  /* DMALLOC_PASSTHROUGH */
+
+#warning "dmalloc library functionality disabled"
+
+void * dmalloc_calloc_intercept(size_t count, size_t size)
+{
+  dputc('c', stderr);
+  return libc_calloc_wrapper(count, size);
+}
+
+void dmalloc_free_intercept(void *ptr)
+{
+  dputc('f', stderr);
+  libc_free_wrapper(ptr);
+  return;
+}
+
+void * dmalloc_malloc_intercept(size_t size)
+{
+  dputc('m', stderr);
+  return libc_malloc_wrapper(size);
+}
+
+void * dmalloc_realloc_intercept(void *ptr, size_t size)
+{
+  dputc('r', stderr);
+  return libc_realloc_wrapper(ptr, size + dmalloc_cookies_sz());
+}
+
+void * dmalloc_reallocf_intercept(void *ptr, size_t size)
+{
+  dputc('s', stderr);
+  return libc_reallocf_wrapper(ptr, size);
+}
+#endif	/* DMALLOC_PASSTHROUGH */
+
 
 #ifdef LINUX
 void * calloc(size_t count, size_t size)

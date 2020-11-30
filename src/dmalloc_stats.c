@@ -93,13 +93,14 @@ static void dmalloc_agebucket_delete(time_t now, time_t birth)
   if (ndx >= 0) {
     dmalloc_agebuckets_update(now);
 
-    pthread_mutex_lock(&dmalloc_stats_mutex);
-    if (dmalloc_stats.s_agebucket[ndx] != 0) {
-      dmalloc_stats.s_agebucket[ndx]--;
-    } else {
-      dmalloc_stats._s_underrun_agebucket++;
+    if (pthread_mutex_lock(&dmalloc_stats_mutex) == 0) {
+      if (dmalloc_stats.s_agebucket[ndx] != 0) {
+	dmalloc_stats.s_agebucket[ndx]--;
+      } else {
+	dmalloc_stats._s_underrun_agebucket++;
+      }
+      pthread_mutex_unlock(&dmalloc_stats_mutex);
     }
-    pthread_mutex_lock(&dmalloc_stats_mutex);
   }
 }
 
