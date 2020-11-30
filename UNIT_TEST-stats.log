@@ -1,0 +1,85 @@
+root@ac068f733357:/home/ubuntu/dev/src#
+root@ac068f733357:/home/ubuntu/dev/src# ./ut-stats
+---------------------------------------------------------------------
+DMALLOC UNIT TESTS - exercise size_bucket_ndx():
+
+0 byte bucket is               PASSED_  expected          0 actual          0
+1 byte bucket is               PASSED_  expected          0 actual          0
+2 byte bucket is               PASSED_  expected          0 actual          0
+3 byte bucket is               PASSED_  expected          0 actual          0
+4 byte bucket is               PASSED_  expected          1 actual          1
+5 byte bucket is               PASSED_  expected          1 actual          1
+6 byte bucket is               PASSED_  expected          1 actual          1
+7 byte bucket is               PASSED_  expected          1 actual          1
+8 byte bucket is               PASSED_  expected          2 actual          2
+15 byte bucket is              PASSED_  expected          2 actual          2
+2047 byte bucket is            PASSED_  expected          9 actual          9
+2049 byte bucket is            PASSED_  expected         10 actual         10
+4095 byte bucket is            PASSED_  expected         10 actual         10
+4096 byte bucket is            PASSED_  expected         11 actual         11
+4097 byte bucket is            PASSED_  expected         11 actual         11
+1234567 byte bucket is         PASSED_  expected         11 actual         11
+unit total tests 16 passed 16 failed 0
+---------------------------------------------------------------------
+DMALLOC UNIT TESTS - exercise failed malloc and basic lock:
+
+unit total tests 0 passed 0 failed 0
+---------------------------------------------------------------------
+DMALLOC UNIT TESTS - exercise age and size buckets:
+
+current allocation             PASSED_  expected      16383 actual      16383
+alltime allocation             PASSED_  expected      16383 actual      16383
+age  bucket 0                  PASSED_  expected         15 actual         15
+size bucket 0                  PASSED_  expected          3 actual          3
+size bucket 1                  PASSED_  expected          1 actual          1
+size bucket 2                  PASSED_  expected          1 actual          1
+size bucket 3                  PASSED_  expected          1 actual          1
+size bucket 4                  PASSED_  expected          1 actual          1
+size bucket 5                  PASSED_  expected          1 actual          1
+size bucket 6                  PASSED_  expected          1 actual          1
+size bucket 7                  PASSED_  expected          1 actual          1
+size bucket 8                  PASSED_  expected          1 actual          1
+size bucket 9                  PASSED_  expected          1 actual          1
+size bucket 10                 PASSED_  expected          1 actual          1
+size bucket 11                 PASSED_  expected          2 actual          2
+declined update                PASSED_  expected         14 actual         14
+size bucket 11                 PASSED_  expected          3 actual          3
+declined update                PASSED_  expected         14 actual         14
+age  bucket 0                  PASSED_  expected          1 actual          1
+age  bucket 1                  PASSED_  expected         15 actual         15
+current allocation             PASSED_  expected      24575 actual      24575
+alltime allocation             PASSED_  expected      24575 actual      24575
+size bucket 11                 PASSED_  expected          4 actual          4
+age  bucket 0                  PASSED_  expected          1 actual          1
+age  bucket 998                PASSED_  expected          1 actual          1
+age  bucket 999                PASSED_  expected         15 actual         15
+size bucket 11                 PASSED_  expected          5 actual          5
+age  bucket 0                  PASSED_  expected          1 actual          1
+age  bucket 999                PASSED_  expected         16 actual         16
+size bucket 11                 PASSED_  expected          6 actual          6
+age  bucket 0                  PASSED_  expected          1 actual          1
+age  bucket 999                PASSED_  expected         17 actual         17
+current allocation             PASSED_  expected      49151 actual      49151
+alltime allocation             PASSED_  expected      49151 actual      49151
+---------------------------------------------------------------------
+DMALLOC UNIT TESTS - now check free::
+
+current allocation             PASSED_  expected      49151 actual      49151
+alltime allocation             PASSED_  expected      49151 actual      49151
+current allocation             PASSED_  expected      49151 actual      49151
+alltime allocation             PASSED_  expected      49151 actual      49151
+size underrun                  PASSED_  expected          1 actual          1
+current allocation             PASSED_  expected       4095 actual       4095
+alltime allocation             PASSED_  expected      49151 actual      49151
+age  bucket 999                PASSED_  expected         13 actual         13
+age  bucket 0                  PASSED_  expected          0 actual          0
+current allocation             PASSED_  expected       4095 actual       4095
+age  bucket 0                  PASSED_  expected          0 actual          0
+current allocation             PASSED_  expected          0 actual          0
+alltime allocation             PASSED_  expected      49151 actual      49151
+age bucket 999                 PASSED_  expected          0 actual          0
+age bucket 0                   PASSED_  expected          0 actual          0
+age bucket population          PASSED_  expected          0 actual          0
+size bucket population         PASSED_  expected          0 actual          0
+unit total tests 51 passed 51 failed 0
+root@ac068f733357:/home/ubuntu/dev/src#

@@ -1,0 +1,28 @@
+# -*- MakeFile -*-
+# 
+# unit test for wrappers subsystem
+#
+
+objects := dmalloc.o dmalloc_common.o dmalloc_stats.o libc_wrappers_linux.o
+depends := $(objects:.o=.d)
+target  := ut-wrap
+
+uname := $(shell uname -s)
+ifeq ($(uname), Linux)
+	os = LINUX
+endif
+ifeq ($(uname), Darwin)
+	os = DARWIN
+endif
+
+%.o: %.c
+	gcc -g -std=c99 -Wall -Wextra -D DMALLOC_DEBUG -D DMALLOC_UNIT_TEST_WRAPPERS -D $(os) -c  $<  -o $@
+	@gcc -MM $*.c > $*.d
+
+$(target): $(objects)
+	gcc -g  $^  -ldl -o $@	
+
+clean:
+	rm -f *.o *.d *~ $(target)
+
+-include $(depends)

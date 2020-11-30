@@ -1,0 +1,54 @@
+root@ac068f733357:/home/ubuntu/dev# cd src/
+root@ac068f733357:/home/ubuntu/dev/src# make -f Makefile.unit_test_logs
+gcc -g -std=c99 -Wall -Wextra -D DMALLOC_UNIT_TEST -D LINUX -c  dmalloc_log.c  -o dmalloc_log.o
+gcc -g -std=c99 -Wall -Wextra -D DMALLOC_UNIT_TEST -D LINUX -c  dmalloc_common.c  -o dmalloc_common.o
+gcc -g  dmalloc_log.o dmalloc_common.o  -o ut-logs
+root@ac068f733357:/home/ubuntu/dev/src# ./ut-logs
+---------------------------------------------------------------------
+DMALLOC UNIT TESTS - exercise logging:
+
+unit total tests 0 passed 0 failed 0
+1024 bucket is largest         PASSED_  expected       1536 actual       1536
+0000 bucket is largest         PASSED_  expected       1536 actual       1536
+scalar for 160 @ 80 columns    PASSED_  expected          2 actual          2
+scalar for 320 @ 80 columns    PASSED_  expected          4 actual          4
+scalar for 400 @ 80 columns    PASSED_  expected          5 actual          5
+scalar for 100 @ 68 columns    PASSED_  expected          2 actual          2
+4096 bucket is largest         PASSED_  expected       6144 actual       6144
+160 @ 2    : ################################################################################.
+80 @ 1     : ################################################################################
+40 @ 2     : ####################.
+512 @ 1024 : .
+511 @ 1024 : .
+0 @ 80     :
+========== dmalloc v0.4: UTC Sun Nov 29 00:57:09 2020 ==========
+overall allocations:      4,294,967,295
+current allocations:      4,294,967,295
+current alloc bytes:      0
+
+debug stats enabled:
+age underruns:            0
+size underruns:           0
+lock errors:              0
+declined updates:         0
+
+histogram: allocation size: (one # represents approx 90353 bytes)
+0    -    4: .
+4    -    8: .
+8    -   16: .
+16   -   32: .
+32   -   64: .
+64   -  128: #.
+128  -  256: ##.
+256  -  512: ####.
+512  - 1024: ########.
+1024 - 2048: ################.
+2048 - 4096: #################################.
+4096 - infi: ###################################################################.
+
+histogram: allocations age: (one # represents appox 1471  allocs)
+<    10 sec: .
+<   100 sec: .
+<  1000 sec: ######.
+>= 1000 sec: ###################################################################.
+root@ac068f733357:/home/ubuntu/dev/src#

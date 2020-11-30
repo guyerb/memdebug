@@ -21,8 +21,8 @@ static realloc_t libc_reallocp = NULL;
 
 /* my_malloc() - simple memory for early allocations from dlym(),
    before we have resolved libc routines */
-#define DMALLOC_PREINIT_ROWS 5
-#define DMALLOC_PREINIT_SIZE 256
+#define DMALLOC_PREINIT_ROWS 4
+#define DMALLOC_PREINIT_SIZE 2048
 static uint8_t dmalloc_preinit_buffer[DMALLOC_PREINIT_ROWS][DMALLOC_PREINIT_SIZE];
 static uint8_t dmalloc_row = 0;
 
@@ -34,6 +34,7 @@ static void * my_malloc(size_t size)
   UNUSED(size);
 
   ptr = &dmalloc_preinit_buffer[dmalloc_row][0];
+  memset(ptr, 0, DMALLOC_PREINIT_SIZE);
   dmalloc_row = (dmalloc_row + 1) % DMALLOC_PREINIT_ROWS;
 
   return ptr;
@@ -42,49 +43,72 @@ static void * my_malloc(size_t size)
 void __attribute__ ((constructor)) libc_wrapper_init(void)
 {
   /* fish for pointers to actual malloc routines */
-  putc('!', stderr);
+  dputc('!', stderr);
   libc_callocp = (calloc_t)dlsym(RTLD_NEXT, "calloc");
   libc_freep = (free_t)dlsym(RTLD_NEXT, "free");
   libc_mallocp = (malloc_t)dlsym(RTLD_NEXT, "malloc");
   libc_reallocp = (realloc_t)dlsym(RTLD_NEXT, "realloc");
   dmalloc_printf("c %p, f %p, m %p r %p\n", libc_callocp, libc_freep, libc_mallocp, libc_reallocp);
+  dputc('<', stderr);
+}
+
+int libc_wrappers_initialized()
+{
+  return (libc_reallocp != NULL);
 }
 
 void * libc_calloc_wrapper(size_t count, size_t size)
 {
-  return libc_callocp(count, size);
+  void *ptr;
+
+  dputc('C', stderr);
+  if (!libc_callocp) {
+    dputc('E', stderr);
+    ptr = my_malloc(size);
+  } else {
+    dputc('>', stderr);
+    ptr = libc_callocp(count, size);
+  }
+  return ptr;
 }
 
 void libc_free_wrapper(void *ptr)
 {
+  dputc('F', stderr);
   if (ptr >= (void *)dmalloc_preinit_buffer &&
       ptr < (void *)(dmalloc_preinit_buffer + sizeof(dmalloc_preinit_buffer))) {
-    putc('e', stderr);
-    return;
+    dputc('e', stderr);
+  } else {
+    if (libc_freep)
+      libc_freep(ptr);
+    else
+      dputc('?', stderr);
   }
-  putc('F', stderr);
-  libc_freep(ptr);
 }
 
 void * libc_malloc_wrapper(size_t size)
 {
-  void *p;
+  void *ptr = NULL;
 
+  dputc('M', stderr);
   if (!libc_mallocp) {
-    putc('E', stderr);
-    p = my_malloc(size);
+    dputc('E', stderr);
+    ptr = my_malloc(size);
   } else {
-    putc('M', stderr);
-    p = libc_mallocp(size);
+    dputc('>', stderr);
+    ptr = libc_mallocp(size);
   }
-  return p;
+  return ptr;
 }
 
 void * libc_realloc_wrapper(void *ptr, size_t size)
 {
-  void *p;
+  void *p = NULL;
 
-  putc('R', stderr);
-  p = libc_reallocp(ptr, size);
+  dputc('R', stderr);
+  if (libc_reallocp)
+    p = libc_reallocp(ptr, size);
+  else
+    dputc('?', stderr);
   return p;
 }
