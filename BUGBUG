@@ -1,0 +1,11 @@
+
+Running make check, some items will move into the 10-100 second
+bucket. The test program is supposedly written such that there are no
+long lived allocations. Can't find the error in the test program, the
+aging code or the display code. There might be a logical explanation.
+
+histogram: allocations age: (one # represents appox 1  allocs)
+<    10 sec: ###################
+<   100 sec: ################
+<  1000 sec: 
+>= 1000 sec: 

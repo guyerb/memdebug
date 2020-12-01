@@ -7,11 +7,13 @@
 
 #include "dmalloc_stats.h"
 #include "dmalloc_common.h"
+#include "libc_wrappers.h"
 
 
 struct dmalloc_alloc_stats dmalloc_stats = {0};
 
 static pthread_mutex_t dmalloc_stats_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t dmalloc_ageb_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void dmalloc_stats_getter(struct dmalloc_alloc_stats *pcopy)
 {
@@ -23,48 +25,6 @@ void dmalloc_stats_getter(struct dmalloc_alloc_stats *pcopy)
     dmalloc_stats._s_errorlock++;
   }
 }
-
-/*
- * we monitor the age of each allocation by grouping them in buckets,
- * where each bucket represents one second of age. We bump them
- * forward by elapsed time since last update. For a full discussion
- * see NOTES sections of top-level README.
- */
-static void dmalloc_agebuckets_update(time_t now)
-{
-  time_t elapsed;
-
-  if (pthread_mutex_lock(&dmalloc_stats_mutex) == 0) {
-    elapsed = now - dmalloc_stats.s_last_ageupdate;
-    dmalloc_stats.s_last_ageupdate = now;
-    pthread_mutex_unlock(&dmalloc_stats_mutex);
-
-    if (elapsed > 0) {
-      for (int i = BUCKETS_AGE_NUM; i > 0; i--) {
-	int src_ndx = i - 1;
-	int dst_ndx = src_ndx + elapsed;
-	time_t src_val = dmalloc_stats.s_agebucket[src_ndx];
-
-	if (src_ndx == 999) continue;	/* bucket 1000 doesn't age */
-	dmalloc_stats.s_agebucket[src_ndx] = 0;
-	if (dst_ndx >= 999)
-	  dmalloc_stats.s_agebucket[999] += src_val;
-	else
-	  dmalloc_stats.s_agebucket[dst_ndx] = src_val;
-      }
-    } else {
-      dmalloc_stats._s_declined_update++;
-    }
-  } else {
-    dmalloc_stats._s_errorlock++;
-  }
-}
-
-static void dmalloc_agebucket_insert()
-{
-  dmalloc_stats.s_agebucket[0]++;
-}
-
 
 static int dmalloc_agebucket_ndx(time_t now, time_t birth)
 {
@@ -80,27 +40,88 @@ static int dmalloc_agebucket_ndx(time_t now, time_t birth)
   return ndx;
 }
 
+static int doing_logs_update = 0;
+void  dmalloc_logs_update(time_t now)
+{
+  time_t elapsed;
+
+  if (!libc_wrappers_initialized()) return;
+
+  if (pthread_mutex_lock(&dmalloc_stats_mutex) == 0) {
+    if (doing_logs_update) {
+      pthread_mutex_unlock(&dmalloc_stats_mutex);
+      return;
+    }
+    elapsed = now - dmalloc_stats.s_last_logupdate;
+    if (elapsed >= 5) {
+      doing_logs_update = 1;
+      dmalloc_stats.s_last_logupdate = now;
+    }
+    pthread_mutex_unlock(&dmalloc_stats_mutex);
+  } else {
+    dmalloc_stats._s_errorlock++;
+  }
+  if (doing_logs_update) {
+    dmalloc_log_stats();
+    doing_logs_update = 0;
+  }
+}
+
+/*
+ * we monitor the age of each allocation by grouping them in buckets,
+ * where each bucket represents one second of age. We bump them
+ * forward by elapsed time since last update.
+ */
+static void dmalloc_agebuckets_update(time_t now)
+{
+  time_t elapsed = 0;
+
+  
+  if (pthread_mutex_lock(&dmalloc_ageb_mutex) == 0) {
+    elapsed = now - dmalloc_stats.s_last_ageupdate;
+    if (elapsed > 0)
+      dmalloc_stats.s_last_ageupdate = now;
+
+    if (elapsed > 0) {
+      dputc('A', stderr);
+      for (int i = BUCKETS_AGE_NUM; i > 0; i--) {
+	int src_ndx = i - 1;
+	int dst_ndx = src_ndx + elapsed;
+	time_t src_val = dmalloc_stats.s_agebucket[src_ndx];
+
+	if (src_ndx == 999) continue;	/* bucket 1000 doesn't age */
+	dmalloc_stats.s_agebucket[src_ndx] = 0;
+	if (dst_ndx >= 999)
+	  dmalloc_stats.s_agebucket[999] += src_val;
+	else
+	  dmalloc_stats.s_agebucket[dst_ndx] = src_val;
+      }
+    } else {
+      dmalloc_stats._s_declined_update++;
+    }
+    pthread_mutex_unlock(&dmalloc_ageb_mutex);
+  } else {
+    dmalloc_stats._s_errorlock++;
+  }
+}
+
+static void dmalloc_agebucket_insert(time_t now)
+{
+  dmalloc_agebuckets_update(now);
+  dmalloc_stats.s_agebucket[0]++;
+}
+
 /* This element was allocated sometime in the past as indicated by
    age. We can determine how old it is by subtracting the current time
-   from that age then compute the bucket index. If we don't find any
-   elements in that bucket we will proceed down the list and decrease
-   the population by one at the next populated bucket */
+   from that age then compute the bucket index. */
 static void dmalloc_agebucket_delete(time_t now, time_t birth)
 {
-  int ndx = 0;
-
-  ndx = dmalloc_agebucket_ndx(now, birth);
-  if (ndx >= 0) {
-    dmalloc_agebuckets_update(now);
-
-    if (pthread_mutex_lock(&dmalloc_stats_mutex) == 0) {
-      if (dmalloc_stats.s_agebucket[ndx] != 0) {
-	dmalloc_stats.s_agebucket[ndx]--;
-      } else {
-	dmalloc_stats._s_underrun_agebucket++;
-      }
-      pthread_mutex_unlock(&dmalloc_stats_mutex);
-    }
+  dmalloc_agebuckets_update(now);
+  int ndx = dmalloc_agebucket_ndx(now, birth);
+  if (ndx != -1 && dmalloc_stats.s_agebucket[ndx] != 0) {
+    dmalloc_stats.s_agebucket[ndx]--;
+  } else {
+    dmalloc_stats._s_underrun_agebucket++;
   }
 }
 
@@ -144,8 +165,8 @@ void dmalloc_stats_alloc(size_t sz, time_t now)
     dmalloc_stats._s_errorlock++;
  }
 
-  dmalloc_agebuckets_update(now);
-  dmalloc_agebucket_insert();
+  dmalloc_agebucket_insert(now);
+  dmalloc_logs_update(now);
 
   return;
 }
@@ -172,6 +193,7 @@ void dmalloc_stats_free(size_t sz, time_t now, time_t birth)
   } else {
     dmalloc_stats._s_errorlock++;
   }
+  dmalloc_logs_update(now);
   return;
 }
 

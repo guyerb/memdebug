@@ -1,8 +1,8 @@
 #ifndef DMALLOC_VERSION_H
 // Update these when the version changes
 
-#define dmalloc_major 0
-#define dmalloc_minor 6
+#define dmalloc_major 1
+#define dmalloc_minor 0
 
 #define XSTR(x) STR(x)
 #define STR(x) #x

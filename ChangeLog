@@ -1,4 +1,6 @@
 ChangeLog for dmalloc
+2020-11-30 - v1.0
+	* test output checked in and debugging
 2020-11-29 - v0.6
 	* unit testing and bug fixes on wrappers
 	(cd src && make -f Makefile.unit_test_wrappers && ./ut-wrap)

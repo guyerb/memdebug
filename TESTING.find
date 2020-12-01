@@ -1,0 +1,53 @@
+root@69612180a24c:/# LD_PRELOAD=/home/ubuntu/dev/src/libdmalloc.so find . 2>logfile.out
+
+N.B. My directory tree under Docker was not really deep enough to
+really exercise the lib. Results here were done with a 1 second
+logupdate rather than normal 5.
+
+
+========== dmalloc v0.6: UTC Mon Nov 30 11:40:33 2020 ==========
+overall allocations:      1,806
+current allocations:      48
+current alloc bytes:      0
+histogram: allocation size: (one # represents approx 1 bytes)
+0    -    4: 
+4    -    8: 
+8    -   16: 
+16   -   32: ########################
+32   -   64: ################################################
+64   -  128: 
+128  -  256: 
+256  -  512: 
+512  - 1024: 
+1024 - 2048: 
+2048 - 4096: 
+4096 - infi: 
+
+histogram: allocations age: (one # represents appox 1  allocs)
+<    10 sec: ##
+<   100 sec: 
+<  1000 sec: 
+>= 1000 sec: 
+========== dmalloc v0.6: UTC Mon Nov 30 11:40:34 2020 ==========
+overall allocations:      97,080,813
+current allocations:      25,783
+current alloc bytes:      0
+histogram: allocation size: (one # represents approx 396 bytes)
+0    -    4: .
+4    -    8: .
+8    -   16: .
+16   -   32: ##.
+32   -   64: .
+64   -  128: .
+128  -  256: .
+256  -  512: ###################################################################.
+512  - 1024: .
+1024 - 2048: ###.
+2048 - 4096: .
+4096 - infi: ###############.
+
+histogram: allocations age: (one # represents appox 2  allocs)
+<    10 sec: ##########################################################.
+<   100 sec: .
+<  1000 sec: .
+>= 1000 sec: .

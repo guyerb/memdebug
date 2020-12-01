@@ -182,7 +182,7 @@ static void logline_range_scaled(char *hdr, uint32_t *p, uint32_t floor, uint32_
 {
   uint32_t count = 0;
 
-  for ( ; floor < ceiling; floor++) {
+  for ( ; floor <= ceiling; floor++) {
     count += p[floor];
   }
   logline_scaled(hdr, count, scale);
@@ -205,6 +205,7 @@ void dmalloc_log_stats()
   struct tm *pgm = NULL;
   char * pgm_str = NULL;
 
+  dputc('L', stderr);
   dmalloc_stats_getter(&stats);	/* get local copy */
 
   pgm = gmtime(&now);

@@ -16,7 +16,7 @@ been designed and tested on Linux but should run on Mac OS with
 minimal debug. To see the test code in action then from the terminal
 and inside the dmalloc directory type:
 
-      make && make check
+      make && make check   // CTRL-C to exit
 
 A variety of debug information will be printed on stderr every five
 seconds or thereabouts. More on the output format in OUTPUT below.
@@ -83,9 +83,9 @@ OUTPUT
 Output of stats to stderr is at most once every five seconds but may
 be longer. If the program being monitored is not making
 allocation/free calls then there may not be any output. Following is
-come representative log output. The allocations size histogram is a
+some representative log output. The allocations size histogram is a
 little odd as it doesn't express the number of allocations in a size
-range but rather the number of bytes kiving in allocations in that
+range but rather the number of bytes living in allocations in that
 range. It would be useful to log both histograms.
 
 ========== dmalloc v0.5: UTC Sun Nov 29 00:57:09 2020 ==========
@@ -130,7 +130,7 @@ Current allocations by age: ( # = 8,123 current allocations)
 < 1000 sec: ######################### > 1000 sec:
 
 
-We keep an array of 1000 age buckets each holds the count of
+We keep an array of 1000 age buckets, each bucket holds the count of
 allocations sharing that birthday. For instance, a count of 3 at index
 4 (the 5th position) indicates we have 3 allocations that have
 persisted for five seconds. We update the list opportunistically and
@@ -139,7 +139,7 @@ second.
 
 There is a loss of accuracy in the first bucket. We don't know how
 long an allocation has really existed during that first second. It may
-have enetered that bucket only a few milliseconds before a one second
+have entered that bucket only a few milliseconds before a one second
 boundary and then finds itself quickly promoted to the next
 bucket. For subsequent time slots all promotions are accurate,
 i.e. errors don't accumulate.
@@ -156,8 +156,7 @@ reenter ourselves. If we block then we hang the library. To prevent
 this we acknoweldge that we are reentrant and take steps to prevent
 issues. Namely, upon entry to a routine we note if we are already in
 the library via some flag and if so then we simply call through to the
-libc routine without doing any more processing. This will allow any
-printf() or other routines that we are performing to cause problem.
+libc routine without doing any more processing.
 
 ==================================================================
 PROBLEMS
@@ -174,10 +173,10 @@ PROBLEMS
 ==================================================================
 TODO
 
-*  realloc() - Currently realloc() statistics gathers treats a realloc
-as a free followed by an alloc. This loses precision on the lifetime
-of the allocation. A bettr implementation might notice that the base
-pointer has not changed and simnply update the total bytes allocated
-as a result.
+* realloc() - Currently realloc() statistics gathering treats a
+realloc as a free followed by an alloc. This loses precision on the
+lifetime of the allocation. A bettr implementation might notice that
+the base pointer has not changed and simnply update the total bytes
+allocated as a result.
 
 

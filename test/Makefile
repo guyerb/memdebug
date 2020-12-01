@@ -14,7 +14,7 @@ endif
 	gcc -g -std=c99 -Wall -Wextra  -c $<  -o $@
 
 $(target): checks.o
-	gcc -g   $^  -o $@
+	gcc -g   $^ -lpthread -o $@
 
 check: $(target)
 	@echo run with injected malloc calls
